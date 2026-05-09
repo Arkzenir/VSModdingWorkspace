@@ -71,9 +71,15 @@ function Invoke-Help {
     Write-Host ""
     Write-Host "  Target mod:" -ForegroundColor Cyan
     Write-Host "    new-mod <ModName>            Scaffold a new mod project from scratch"
-    Write-Host "    import-mod <src> [Name]      Import an existing mod (folder, zip, or git URL)"
+    Write-Host "    import-mod <src> [Name]      Import existing mod (folder, zip, or git URL)"
     Write-Host "    use-mod <ModName>            Set the active target mod"
     Write-Host "    list-mods                    List all mods in the mods\ folder"
+    Write-Host ""
+    Write-Host "  Git workflow:" -ForegroundColor Cyan
+    Write-Host "    publish-mod [branch] [remote]   Commit mod to a branch and push (default: mod/{modid})"
+    Write-Host "    export-mod <git-url>             Push mod as a standalone repo to a remote URL"
+    Write-Host "    reset [clean]                    Reset workspace.json to neutral state"
+    Write-Host "                                     'clean' also removes local api\, gamesrc\, mods\, etc."
     Write-Host ""
     Write-Host "  Workspace:" -ForegroundColor Cyan
     Write-Host "    status                       Show current workspace configuration"
@@ -152,6 +158,72 @@ function Invoke-Status {
     Write-Host ""
 }
 
+# ─── version commit helper ───────────────────────────────────────────────────
+# Searches a cloned repo for a commit matching the requested version.
+# Tries exact string match first; if that fails, parses all commit messages for
+# semantic version strings and returns the closest one (highest version <= requested,
+# then lowest version > requested).  Returns $null if no version commits exist at all.
+function Find-VersionCommit {
+    param([string]$RepoPath, [string]$Label)
+
+    $label = $Label.TrimStart("v")
+    $logOutput = @(git -C $RepoPath log --format="%H %s" 2>&1 |
+                   Where-Object { $_ -notmatch '^fatal:' })
+    if ($logOutput.Count -eq 0) { return $null }
+
+    # Step 1 - exact string match
+    $exactLine = $logOutput |
+                 Where-Object { $_ -match [regex]::Escape($label) } |
+                 Select-Object -First 1
+    if ($exactLine) {
+        $hash   = ($exactLine -split '\s+')[0]
+        $parts  = $exactLine -split '\s+', 2
+        $subj   = if ($parts.Count -gt 1) { $parts[1] } else { $parts[0] }
+        return [PSCustomObject]@{ Hash = $hash; Subject = $subj; MatchedVersion = $label; IsExact = $true }
+    }
+
+    # Step 2 - parse requested version as System.Version
+    $reqVer = $null
+    try { $reqVer = [System.Version]$label } catch { return $null }
+
+    # Step 3 - collect all version-like strings across all commits
+    # git log is newest-first, so first occurrence of each version = newest commit for it
+    $versionRx   = [regex]'\b(\d+\.\d+(?:\.\d+)?(?:\.\d+)?)\b'
+    $seen        = @{}
+    $candidates  = New-Object 'System.Collections.Generic.List[object]'
+
+    foreach ($line in $logOutput) {
+        $rxMatches = $versionRx.Matches($line)
+        foreach ($m in $rxMatches) {
+            $verStr = $m.Value
+            if ($seen.ContainsKey($verStr)) { continue }
+            $ver = $null
+            try { $ver = [System.Version]$verStr } catch { continue }
+            $seen[$verStr] = $true
+            $hash  = ($line -split '\s+')[0]
+            $parts = $line -split '\s+', 2
+            $subj  = if ($parts.Count -gt 1) { $parts[1] } else { $parts[0] }
+            $candidates.Add([PSCustomObject]@{
+                Hash = $hash; Subject = $subj; Version = $ver; VersionStr = $verStr
+            })
+        }
+    }
+
+    if ($candidates.Count -eq 0) { return $null }
+
+    # Step 4 - sort: highest version <= requested first, then lowest version > requested
+    $below   = @($candidates | Where-Object { $_.Version -le $reqVer } | Sort-Object Version -Descending)
+    $above   = @($candidates | Where-Object { $_.Version -gt $reqVer } | Sort-Object Version)
+    $ordered = @($below) + @($above)
+
+    if ($ordered.Count -eq 0) { return $null }
+    $best = $ordered[0]
+    return [PSCustomObject]@{
+        Hash = $best.Hash; Subject = $best.Subject
+        MatchedVersion = $best.VersionStr; IsExact = $false
+    }
+}
+
 # ─── fetch-api ────────────────────────────────────────────────────────────────
 function Invoke-FetchApi {
     param([string]$Version)
@@ -175,22 +247,20 @@ function Invoke-FetchApi {
     git clone https://github.com/anegostudios/vsapi.git $dest
     if ($LASTEXITCODE -ne 0) { Write-Err "git clone failed."; exit 1 }
 
-    # Search commit messages for the version string (e.g. "1.19.8")
-    $logOutput = @(git -C $dest log --format="%H %s" 2>&1 | Where-Object { $_ -notmatch '^fatal:' })
-    $matchLine = $logOutput | Where-Object { $_ -match [regex]::Escape($label) } | Select-Object -First 1
-
-    if ($matchLine) {
-        $hash    = ($matchLine -split '\s+')[0]
-        $splitParts = $matchLine -split '\s+', 2
-        $subject = if ($splitParts.Count -gt 1) { $splitParts[1] } else { $splitParts[0] }
-        Write-Info "Found: $subject"
-        git -C $dest checkout $hash --quiet
+    $result = Find-VersionCommit $dest $label
+    if ($result) {
+        if ($result.IsExact) {
+            Write-Info "Found: $($result.Subject)"
+        } else {
+            Write-Warn "Exact version '$label' not found -- closest match: $($result.MatchedVersion)"
+            Write-Info "Commit: $($result.Subject)"
+        }
+        git -C $dest checkout $result.Hash --quiet
         if ($LASTEXITCODE -ne 0) { Write-Err "Checkout failed."; exit 1 }
-        Write-Success "Checked out vsapi at version $label (commit $($hash.Substring(0,7)))"
+        Write-Success "Checked out vsapi at $($result.MatchedVersion) (commit $($result.Hash.Substring(0,7)))"
     } else {
-        Write-Warn "No commit found matching '$label' in vsapi history."
-        Write-Warn "The folder contains the latest master HEAD instead."
-        Write-Warn "Browse commit messages manually at: https://github.com/anegostudios/vsapi/commits/master"
+        Write-Warn "No version commits found in vsapi history -- repo is at latest master HEAD."
+        Write-Warn "Browse commits at: https://github.com/anegostudios/vsapi/commits/master"
     }
 
     Invoke-UseApi $label
@@ -266,21 +336,20 @@ function Invoke-FetchGameSrc {
     if ($LASTEXITCODE -ne 0) { Write-Err "git clone failed."; exit 1 }
 
     if ($Version) {
-        $label = $Version.TrimStart("v")
-        $logOutput = @(git -C $dest log --format="%H %s" 2>&1 | Where-Object { $_ -notmatch '^fatal:' })
-        $matchLine = $logOutput | Where-Object { $_ -match [regex]::Escape($label) } | Select-Object -First 1
-
-        if ($matchLine) {
-            $hash       = ($matchLine -split '\s+')[0]
-            $splitParts = $matchLine -split '\s+', 2
-            $subject    = if ($splitParts.Count -gt 1) { $splitParts[1] } else { $splitParts[0] }
-            Write-Info "Found: $subject"
-            git -C $dest checkout $hash --quiet
+        $label  = $Version.TrimStart("v")
+        $result = Find-VersionCommit $dest $label
+        if ($result) {
+            if ($result.IsExact) {
+                Write-Info "Found: $($result.Subject)"
+            } else {
+                Write-Warn "Exact version '$label' not found -- closest match: $($result.MatchedVersion)"
+                Write-Info "Commit: $($result.Subject)"
+            }
+            git -C $dest checkout $result.Hash --quiet
             if ($LASTEXITCODE -ne 0) { Write-Err "Checkout failed."; exit 1 }
-            Write-Success "Checked out $Name at version $label (commit $($hash.Substring(0,7)))"
+            Write-Success "Checked out $Name at $($result.MatchedVersion) (commit $($result.Hash.Substring(0,7)))"
         } else {
-            Write-Warn "No commit found matching '$label' in $Name history."
-            Write-Warn "Repo is at latest master HEAD instead."
+            Write-Warn "No version commits found in $Name history -- repo is at latest master HEAD."
             Write-Warn "Browse commits at: $($url -replace '\.git$','')/commits/master"
         }
     } else {
@@ -918,6 +987,221 @@ function Invoke-ImportMod {
     Write-Host ""
 }
 
+# ─── Git workflow helpers ─────────────────────────────────────────────────────
+function Get-ModVersion {
+    param([string]$ModDir)
+    # Try Directory.Build.props first (workspace-native mods)
+    $dbp = Join-Path $ModDir "Directory.Build.props"
+    if (Test-Path $dbp) {
+        $match = Select-String -Path $dbp -Pattern '<ModVersion>(.*?)</ModVersion>'
+        if ($match) { return $match.Matches[0].Groups[1].Value.Trim() }
+    }
+    # Fall back to modinfo.json
+    $mi = Join-Path $ModDir "modinfo.json"
+    if (Test-Path $mi) {
+        try {
+            $obj = Get-Content $mi -Raw | ConvertFrom-Json
+            if ($obj.version) { return $obj.version }
+        } catch {}
+    }
+    return "1.0.0"
+}
+
+function Assert-GitRepo {
+    $result = git -C $Root rev-parse --git-dir 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        Write-Err "The workspace folder is not a git repository."
+        Write-Info "Run: git init  then  git remote add origin <url>"
+        exit 1
+    }
+}
+
+# ─── publish-mod ──────────────────────────────────────────────────────────────
+function Invoke-PublishMod {
+    param([string]$Branch = "", [string]$Remote = "origin")
+
+    Assert-GitRepo
+
+    $ws      = Get-Workspace
+    $modName = $ws.targetMod
+    if (-not $modName) { Write-Err "No target mod set.  Run: use-mod <ModName>"; exit 1 }
+
+    $modId   = $modName.ToLower() -replace '[^a-z0-9]', ''
+    $modDir  = Join-Path (Join-Path $Root "mods") $modName
+    if (-not (Test-Path $modDir)) { Write-Err "Mod folder not found: mods\$modName"; exit 1 }
+
+    if (-not $Branch) { $Branch = "mod/$modId" }
+
+    $modVersion = Get-ModVersion $modDir
+    $commitMsg  = "Mod: $modName v$modVersion"
+
+    # Remember current branch so we can return to it
+    $originalBranch = git -C $Root rev-parse --abbrev-ref HEAD 2>&1
+    if ($LASTEXITCODE -ne 0 -or $originalBranch -eq "HEAD") {
+        $originalBranch = "main"
+    }
+
+    Write-Header "Publishing mod: $modName"
+    Write-Info "Branch:   $Branch"
+    Write-Info "Remote:   $Remote"
+    Write-Info "Version:  $modVersion"
+    Write-Info "Returning to: $originalBranch after push"
+    Write-Host ""
+
+    # Stash any uncommitted workspace changes so we can safely switch branches
+    $stashResult = git -C $Root stash --include-untracked 2>&1
+    $stashed = $stashResult -notmatch 'No local changes'
+
+    try {
+        # Create or reset the mod branch from current HEAD
+        git -C $Root checkout -B $Branch
+        if ($LASTEXITCODE -ne 0) { Write-Err "Could not create branch '$Branch'."; exit 1 }
+
+        # Force-add the mod folder (bypasses the workspace .gitignore)
+        $relModPath = Join-Path "mods" $modName
+        git -C $Root add --force $relModPath
+        if ($LASTEXITCODE -ne 0) { Write-Err "git add failed."; exit 1 }
+
+        # Also commit the current workspace.json so the branch records context
+        git -C $Root add workspace.json 2>&1 | Out-Null
+
+        $status = git -C $Root status --porcelain 2>&1
+        if (-not $status) {
+            Write-Warn "Nothing to commit - mod branch is already up to date."
+        } else {
+            git -C $Root commit -m $commitMsg
+            if ($LASTEXITCODE -ne 0) { Write-Err "git commit failed."; exit 1 }
+            Write-Success "Committed: $commitMsg"
+        }
+
+        # Push
+        git -C $Root push $Remote $Branch --set-upstream
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warn "Push failed - remote may not be configured."
+            Write-Info "To push manually: git push $Remote ${Branch} --set-upstream"
+        } else {
+            Write-Success "Pushed to $Remote/$Branch"
+        }
+    } finally {
+        # Always return to original branch
+        git -C $Root checkout $originalBranch 2>&1 | Out-Null
+        if ($stashed) {
+            git -C $Root stash pop 2>&1 | Out-Null
+        }
+    }
+
+    Write-Host ""
+    Write-Success "Done. Back on branch: $originalBranch"
+    Write-Info "Mod source is on branch '$Branch' and your workspace is unchanged."
+}
+
+# ─── export-mod ───────────────────────────────────────────────────────────────
+function Invoke-ExportMod {
+    param([string]$RemoteUrl = "")
+
+    $ws      = Get-Workspace
+    $modName = $ws.targetMod
+    if (-not $modName) { Write-Err "No target mod set.  Run: use-mod <ModName>"; exit 1 }
+
+    $modDir = Join-Path (Join-Path $Root "mods") $modName
+    if (-not (Test-Path $modDir)) { Write-Err "Mod folder not found: mods\$modName"; exit 1 }
+
+    $modVersion = Get-ModVersion $modDir
+    $commitMsg  = "Mod: $modName v$modVersion"
+
+    Write-Header "Exporting mod as standalone repo: $modName"
+
+    # Initialise git repo inside the mod folder if not already
+    $gitDir = Join-Path $modDir ".git"
+    if (-not (Test-Path $gitDir)) {
+        Write-Info "Initialising git repo in mods\$modName\"
+        git -C $modDir init
+        git -C $modDir checkout -b main 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            # Older git uses 'master' as default; rename it
+            git -C $modDir branch -m master main 2>&1 | Out-Null
+        }
+    }
+
+    # Stage everything
+    git -C $modDir add .
+    $status = git -C $modDir status --porcelain 2>&1
+    if ($status) {
+        git -C $modDir commit -m $commitMsg
+        if ($LASTEXITCODE -ne 0) { Write-Err "git commit failed."; exit 1 }
+        Write-Success "Committed: $commitMsg"
+    } else {
+        Write-Info "Nothing new to commit."
+    }
+
+    # Set or update remote
+    if ($RemoteUrl) {
+        git -C $modDir remote remove origin 2>&1 | Out-Null
+        git -C $modDir remote add origin $RemoteUrl
+        Write-Info "Remote set to: $RemoteUrl"
+
+        git -C $modDir push origin main --set-upstream --force
+        if ($LASTEXITCODE -ne 0) {
+            Write-Err "Push failed. Verify the remote URL and your access rights."
+            Write-Info "The local repo at mods\$modName is ready - push manually when resolved."
+        } else {
+            Write-Success "Pushed to $RemoteUrl"
+        }
+    } else {
+        Write-Success "Standalone repo initialised at mods\$modName\"
+        Write-Info "No remote URL given. To push later:"
+        Write-Info "  git -C mods\$modName remote add origin <url>"
+        Write-Info "  git -C mods\$modName push origin main --set-upstream"
+    }
+}
+
+# ─── reset ────────────────────────────────────────────────────────────────────
+function Invoke-Reset {
+    param([string]$Mode = "")
+
+    $clean = $Mode -eq "clean"
+
+    Write-Header "Resetting workspace to neutral state"
+
+    # Reset workspace.json
+    $ws = Get-Workspace
+    $ws.targetMod    = $null
+    $ws.dependencies = @()
+    $ws.examples     = @()
+    Save-Workspace $ws
+    Write-Success "workspace.json: targetMod cleared, dependencies and examples emptied."
+    Write-Info "gameVersion, apiVersion, dotnetTarget, and gameDirectory are preserved."
+
+    if ($clean) {
+        Write-Host ""
+        Write-Warn "Clean mode: the following local folders will be deleted:"
+        $folders = @("mods", "api", "gamesrc", "dependencies", "examples")
+        $present = @($folders | Where-Object { Test-Path (Join-Path $Root $_) })
+        if ($present.Count -eq 0) {
+            Write-Info "No local folders to remove."
+            return
+        }
+        foreach ($f in $present) { Write-Host "    $f\" -ForegroundColor Yellow }
+        Write-Host ""
+        $confirm = Read-Host "Type YES to confirm deletion"
+        if ($confirm -ne "YES") {
+            Write-Info "Cancelled."
+            return
+        }
+        foreach ($f in $present) {
+            $path = Join-Path $Root $f
+            Remove-Item $path -Recurse -Force
+            Write-Success "Removed: $f\"
+        }
+        Write-Host ""
+        Write-Info "Run '.\scripts\vs-workspace.ps1 init' to recreate the empty folders."
+    } else {
+        Write-Host ""
+        Write-Info "Local folders (api\, gamesrc\, mods\, etc.) were NOT deleted."
+        Write-Info "To also remove them: .\scripts\vs-workspace.ps1 reset clean"
+    }
+}
+
 # ─── Router ───────────────────────────────────────────────────────────────────
 switch ($Command.ToLower()) {
     "build"          { Invoke-Build        (ArgAt $CmdArgs 0 "debug") }
@@ -938,5 +1222,8 @@ switch ($Command.ToLower()) {
     "use-mod"        { Invoke-UseMod       (ArgAt $CmdArgs 0 "") }
     "import-mod"     { Invoke-ImportMod    (ArgAt $CmdArgs 0 "") (ArgAt $CmdArgs 1 "") }
     "new-mod"        { Invoke-NewMod       (ArgAt $CmdArgs 0 "") }
+    "publish-mod"    { Invoke-PublishMod   (ArgAt $CmdArgs 0 "") (ArgAt $CmdArgs 1 "origin") }
+    "export-mod"     { Invoke-ExportMod    (ArgAt $CmdArgs 0 "") }
+    "reset"          { Invoke-Reset        (ArgAt $CmdArgs 0 "") }
     default          { Invoke-Help }
 }
