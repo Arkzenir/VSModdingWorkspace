@@ -270,21 +270,34 @@ The vanilla mod sources show how the game implements its own content — the bes
 .\scripts\vs-workspace.ps1 fetch-gamesrc survival 1.21.5   # specific version
 ```
 
-### Dependency mods (`dependencies\`)
+### Dependency mods
 
-Add source code from mods your project depends on. Claude Code reads these to understand their APIs when writing code that calls them.
+Dependencies come in two kinds — source context for Claude Code, and compiled DLLs for the build system. Usually you need both.
+
+**Source context** (`dependencies\`) — Claude Code reads this to understand a dependency's public API when writing code that calls it:
 
 ```powershell
-# From a git repo
-.\scripts\vs-workspace.ps1 add-dep https://github.com/someone/SomeMod.git
-
-# From a local folder or zip file
-.\scripts\vs-workspace.ps1 add-dep C:\mods\SomeMod
-
-# Manually: copy source to dependencies\SomeMod\, then add "SomeMod" to workspace.json
+.\scriptss-workspace.ps1 add-dep https://github.com/someone/SomeMod.git
+.\scriptss-workspace.ps1 add-dep C:\mods\SomeMod
 ```
 
-For **build-time DLL references** (when your code links against a dependency at compile time), drop the DLL into `mods\MyMod\deps\somedep-1.21\`. The build system auto-references all DLLs under `deps\*-{vsver}\` for the matching version.
+**Build-time DLL reference** — required when your C# code calls into another mod's classes. The compiler needs the DLL to build against. Three tiers are tried in order:
+
+1. DLLs in `$(GameDirectory)/Mods/` — automatic if the dep is installed with the game
+2. DLLs in `mods\MyMod\deps\{name}-{vsver}\` — vendored fallback committed to your mod repo
+3. DLLs in `mods\MyMod\external\` — ad-hoc one-offs
+
+To populate the vendored fallback:
+
+```powershell
+# Auto-discovers from the game's Mods folder
+.\scripts\vs-workspace.ps1 add-dep-dll CarryCapacity 1.21
+
+# Explicit path
+.\scripts\vs-workspace.ps1 add-dep-dll CarryCapacity 1.21 C:\path\to\CarryCapacity.dll
+```
+
+For deps that need a fully customisable install path (overrideable per machine via `localSettings.props`), ask Claude Code to add an explicit named reference — see `CLAUDE.md → Step 3` for the full pattern.
 
 ### Example mods (`examples\`)
 
@@ -340,6 +353,9 @@ list-gamesrc                      List fetched game source repos
 add-dep <path-or-url> [name]      Add dependency mod source for Claude Code context
 remove-dep <name>                 Remove dependency from scope
 list-deps                         List in-scope dependencies
+
+add-dep-dll <name> <vsver> [path] Copy a dep DLL into the active mod's deps\ folder
+                                    Searches game Mods folder automatically if no path given
 
 add-example <path-or-url> [name]  Add example mod for Claude Code context
 remove-example <name>             Remove example from scope

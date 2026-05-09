@@ -7,7 +7,7 @@ Port the current mod to Vintage Story version **$ARGUMENTS**.
    - Changed method signatures (compare vsapi source)
    - Renamed or moved types
    - Updated JSON asset format requirements
-   - .NET target framework changes (net7.0 for VS ≤1.21, net8.0 for VS ≥1.22)
+   - .NET target framework: net7.0 for VS ≤1.20, net8.0 for VS ≥1.21
 5. Create a new `{ModName}_$ARGUMENTS.csproj` modelled on the existing one with the updated `<VSVersion>` and `<TargetFramework>`.
 6. Fix any compilation errors caused by API changes.
 7. Update `localSettings.props.template` with a `GameDirectory` entry for the new version.

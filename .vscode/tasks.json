@@ -70,7 +70,7 @@
                     "args": ["-ExecutionPolicy", "Bypass", "-Command"]
                 }
             },
-            "presentation": { "reveal": "silent", "panel": "dedicated" }
+            "presentation": { "reveal": "always", "panel": "dedicated" }
         },
         {
             "label": "WS: List Mods",
@@ -123,7 +123,21 @@
             "presentation": { "reveal": "always", "panel": "dedicated" }
         },
 
-        // ── Git workflow ─────────────────────────────────────────────────────
+        // ── Dependency DLLs ──────────────────────────────────────────────────
+        {
+            "label": "WS: Add Dep DLL",
+            "type": "shell",
+            "command": "& '${workspaceFolder}\\scripts\\vs-workspace.ps1' add-dep-dll '${input:depDllName}' '${input:depDllVsver}' '${input:depDllPath}'",
+            "options": {
+                "shell": {
+                    "executable": "powershell.exe",
+                    "args": ["-ExecutionPolicy", "Bypass", "-Command"]
+                }
+            },
+            "presentation": { "reveal": "always", "panel": "dedicated" }
+        },
+
+                // ── Git workflow ─────────────────────────────────────────────────────
         {
             "label": "WS: Publish Mod",
             "type": "shell",
@@ -217,6 +231,21 @@
             "description": "Remote git URL (leave empty to only initialise locally)"
         },
         {
+            "id": "depDllName",
+            "type": "promptString",
+            "description": "Dependency name (e.g. CarryCapacity)"
+        },
+        {
+            "id": "depDllVsver",
+            "type": "promptString",
+            "description": "VS version for this dep (e.g. 1.21 or 1.21.5)"
+        },
+        {
+            "id": "depDllPath",
+            "type": "promptString",
+            "description": "Path to DLL (leave empty to auto-search game Mods folder)"
+        },
+                {
             "id": "gameSrcVersion",
             "type": "promptString",
             "description": "Version to check out, e.g. 1.21.5 (leave empty for latest master)"

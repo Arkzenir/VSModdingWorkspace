@@ -39,7 +39,14 @@ function ArgAt    { param($arr, $idx, $default='') $a = @($arr); if ($a.Count -g
 
 # ─── JSON helpers ─────────────────────────────────────────────────────────────
 function Get-Workspace  { Get-Content $WorkspaceJson -Raw | ConvertFrom-Json }
-function Save-Workspace { param($ws) $ws | ConvertTo-Json -Depth 10 | Set-Content $WorkspaceJson -Encoding UTF8 }
+function Save-Workspace {
+    param($ws)
+    # PS 5.1: ConvertTo-Json serialises empty @() as null. Patch output to keep [] syntax.
+    $json = $ws | ConvertTo-Json -Depth 10
+    $json = $json -replace '"dependencies":\s*null', '"dependencies": []'
+    $json = $json -replace '"examples":\s*null',     '"examples": []'
+    $json | Set-Content $WorkspaceJson -Encoding UTF8
+}
 function Get-WsValue    { param([string]$Key) (Get-Workspace).$Key }
 
 # ─── help ─────────────────────────────────────────────────────────────────────
@@ -61,13 +68,19 @@ function Invoke-Help {
     Write-Host "    fetch-gamesrc <name> [ver]   Clone a game source repo (essentials, survival)"
     Write-Host "    list-gamesrc                 List all fetched game source repos"
     Write-Host ""
-    Write-Host "  Dependency / example mods:" -ForegroundColor Cyan
-    Write-Host "    add-dep <path-or-url>        Add a dependency mod (local path or git URL)"
+    Write-Host "  Dependency source (Claude Code context):" -ForegroundColor Cyan
+    Write-Host "    add-dep <path-or-url>        Add a dependency mod source (local path or git URL)"
     Write-Host "    remove-dep <name>            Remove a dependency mod from scope"
+    Write-Host "    list-deps                    List all dependency mods in scope"
     Write-Host "    add-example <path-or-url>    Add an example mod (local path or git URL)"
     Write-Host "    remove-example <name>        Remove an example from scope"
-    Write-Host "    list-deps                    List all dependency mods in scope"
     Write-Host "    list-examples                List all example mods in scope"
+    Write-Host ""
+    Write-Host "  Dependency DLLs (build-time references):" -ForegroundColor Cyan
+    Write-Host "    add-dep-dll <name> <vsver> [dll-path]"
+    Write-Host "      Copies a dependency DLL into the active mod's deps\<name>-<vsver>\ folder."
+    Write-Host "      If dll-path is omitted, searches the game's Mods folder automatically."
+    Write-Host "      The DLL is then auto-referenced for all builds of that VS version."
     Write-Host ""
     Write-Host "  Target mod:" -ForegroundColor Cyan
     Write-Host "    new-mod <ModName>            Scaffold a new mod project from scratch"
@@ -95,7 +108,7 @@ function Invoke-Init {
         if (-not (Test-Path $p)) { New-Item -ItemType Directory -Path $p | Out-Null }
     }
     Write-Success "Created: api\  dependencies\  examples\  mods\  gamesrc\"
-    Write-Info    "Next step: .\scripts\vs-workspace.ps1 fetch-api 1.19.8"
+    Write-Info    "Next step: .\scripts\vs-workspace.ps1 fetch-api <version>  (e.g. 1.21.5)"
 }
 
 # ─── status ───────────────────────────────────────────────────────────────────
@@ -129,9 +142,11 @@ function Invoke-Status {
 
     Write-Host ""
     Write-Host "  Dependencies in scope:" -ForegroundColor Cyan
-    if (@($ws.dependencies).Count -eq 0) { Write-Host "    (none)" }
+    # PS 5.1: ConvertFrom-Json returns $null for []; filter nulls explicitly
+    $wsDeps = @($ws.dependencies | Where-Object { $null -ne $_ -and $_ -ne '' })
+    if ($wsDeps.Count -eq 0) { Write-Host "    (none)" }
     else {
-        foreach ($d in @($ws.dependencies)) {
+        foreach ($d in $wsDeps) {
             $p = Join-Path (Join-Path $Root "dependencies") $d
             if (Test-Path $p) { Write-Host "    v $d" -ForegroundColor Green }
             else               { Write-Host "    x $d  (folder missing)" -ForegroundColor Red }
@@ -140,9 +155,10 @@ function Invoke-Status {
 
     Write-Host ""
     Write-Host "  Examples in scope:" -ForegroundColor Cyan
-    if (@($ws.examples).Count -eq 0) { Write-Host "    (none)" }
+    $wsExamples = @($ws.examples | Where-Object { $null -ne $_ -and $_ -ne '' })
+    if ($wsExamples.Count -eq 0) { Write-Host "    (none)" }
     else {
-        foreach ($e in @($ws.examples)) {
+        foreach ($e in $wsExamples) {
             $p = Join-Path (Join-Path $Root "examples") $e
             if (Test-Path $p) { Write-Host "    v $e" -ForegroundColor Green }
             else               { Write-Host "    x $e  (folder missing)" -ForegroundColor Red }
@@ -420,8 +436,9 @@ function Invoke-RemoveExample { param($n) if(-not $n){Write-Err "Usage: remove-e
 function Invoke-ListDeps {
     Write-Header "Dependencies in scope"
     $ws = Get-Workspace
-    if (@($ws.dependencies).Count -eq 0) { Write-Host "  (none)"; return }
-    foreach ($d in @($ws.dependencies)) {
+    $wsDeps = @($ws.dependencies | Where-Object { $null -ne $_ -and $_ -ne '' })
+    if ($wsDeps.Count -eq 0) { Write-Host "  (none)"; return }
+    foreach ($d in $wsDeps) {
         $p = Join-Path (Join-Path $Root "dependencies") $d
         if (Test-Path $p) { Write-Host "  v $d" -ForegroundColor Green } else { Write-Host "  x $d  (folder missing)" -ForegroundColor Red }
     }
@@ -430,8 +447,9 @@ function Invoke-ListDeps {
 function Invoke-ListExamples {
     Write-Header "Examples in scope"
     $ws = Get-Workspace
-    if (@($ws.examples).Count -eq 0) { Write-Host "  (none)"; return }
-    foreach ($e in @($ws.examples)) {
+    $wsExamples = @($ws.examples | Where-Object { $null -ne $_ -and $_ -ne '' })
+    if ($wsExamples.Count -eq 0) { Write-Host "  (none)"; return }
+    foreach ($e in $wsExamples) {
         $p = Join-Path (Join-Path $Root "examples") $e
         if (Test-Path $p) { Write-Host "  v $e" -ForegroundColor Green } else { Write-Host "  x $e  (folder missing)" -ForegroundColor Red }
     }
@@ -614,9 +632,15 @@ Properties/localSettings.props
   <PropertyGroup>
     <OutputDir>bin/`$(Configuration)/`$(VSVersion)/Mods</OutputDir>
     <OutputPath>`$(OutputDir)/`$(ModId)</OutputPath>
-    <!-- Assembly named ModName_vsver.dll (e.g. MyMod_1.19.dll) -->
+    <!-- Assembly named ModName_vsver.dll (e.g. MyMod_1.21.dll or MyMod_1.21.5.dll) -->
     <AssemblyName>`$(MSBuildProjectName)</AssemblyName>
     <RootNamespace>$Name</RootNamespace>
+    <!--
+      VSMajorMinor: major.minor derived from VSVersion.
+      Allows deps/ folders named by major.minor (e.g. somedep-1.21/) to be found
+      even when building against a specific patch version (e.g. VSVersion=1.21.5).
+    -->
+    <VSMajorMinor>`$([System.Text.RegularExpressions.Regex]::Match(`$(VSVersion), '^\d+\.\d+').Value)</VSMajorMinor>
   </PropertyGroup>
 
   <!-- Game assembly references -->
@@ -628,14 +652,46 @@ Properties/localSettings.props
     <Reference Include="Newtonsoft.Json" HintPath="`$(GameDirectory)/Lib/Newtonsoft.Json.dll" Private="false" />
   </ItemGroup>
 
-  <!-- Vendored per-version deps: any DLL inside deps/*-{vsver}/ is referenced automatically -->
+  <!--
+    Dependency DLL resolution — two tiers:
+
+    TIER 1  Game Mods folder (auto, no vendoring needed)
+      If a dependency mod is installed alongside the game, it is found here.
+      Claude Code can add named property resolution (like CODamageEffects's
+      OverhaulLibDir) when a dep needs explicit localSettings path control.
+
+    TIER 2  Vendored fallback in deps/{name}-{vsver}/
+      Run 'vs-workspace.ps1 add-dep-dll <name> <vsver> [path]' to populate.
+      Allows the mod to build on machines that don't have the dep installed.
+      The glob picks up every DLL in every matching versioned subfolder.
+
+    TIER 3  External ad-hoc DLLs in /external
+      For one-off DLLs that don't warrant a named deps/ entry.
+
+    For named deps with full three-level resolution (localSettings path ->
+    game Mods folder -> vendored fallback), have Claude Code add explicit
+    <PropertyGroup> path resolution and <Reference> items, following the
+    pattern in CODamageEffects/Common.Build.targets.
+  -->
   <ItemGroup>
+    <!-- Tier 1: game Mods folder - any installed mod DLL is a build reference -->
+    <Reference Include="`$(GameDirectory)/Mods/*.dll" Private="false"
+               Condition="Exists('`$(GameDirectory)/Mods')" />
+  </ItemGroup>
+  <ItemGroup>
+    <!--
+      Tier 2: vendored deps - checks exact version first, then major.minor.
+      e.g. deps/somedep-1.21.5/ is found when VSVersion=1.21.5
+           deps/somedep-1.21/   is also found when VSVersion=1.21.5 (major.minor fallback)
+      This lets you store deps at whichever granularity makes sense for that dependency.
+    -->
     <Reference Include="`$(ProjectDir)/deps/*-`$(VSVersion)/*.dll" Private="false"
                Condition="Exists('`$(ProjectDir)/deps')" />
+    <Reference Include="`$(ProjectDir)/deps/*-`$(VSMajorMinor)/*.dll" Private="false"
+               Condition="Exists('`$(ProjectDir)/deps') and '`$(VSMajorMinor)' != '`$(VSVersion)'" />
   </ItemGroup>
-
-  <!-- External / ad-hoc DLLs dropped into /external -->
   <ItemGroup>
+    <!-- Tier 3: ad-hoc DLLs dropped into /external -->
     <Reference Include="`$(ExternalLibDir)/**/*.dll" Private="false"
                Condition="Exists('`$(ExternalLibDir)')" />
   </ItemGroup>
@@ -857,7 +913,14 @@ function Invoke-Build {
     # Debug: build only the csproj matching the active apiVersion (faster iteration)
     # Release: build ALL csproj files (all supported VS versions)
     if ($Mode -eq "debug" -and $ws.apiVersion) {
+        # Try exact match first (e.g. 1.21.5), then major.minor fallback (e.g. 1.21)
         $match = @($csprojs | Where-Object { $_.Name -like "*_$($ws.apiVersion)*" })
+        if ($match.Count -eq 0) {
+            $majorMinor = if ($ws.apiVersion -match '^(\d+\.\d+)') { $Matches[1] } else { $ws.apiVersion }
+            if ($majorMinor -ne $ws.apiVersion) {
+                $match = @($csprojs | Where-Object { $_.Name -like "*_${majorMinor}*" })
+            }
+        }
         if ($match.Count -gt 0) { $csprojs = $match }
     }
 
@@ -1100,18 +1163,20 @@ function Invoke-PublishMod {
     Write-Host ""
 
     # Stash any uncommitted workspace changes so we can safely switch branches
-    $stashResult = git -C $Root stash --include-untracked 2>&1
-    $stashed = $stashResult -notmatch 'No local changes'
+    $stashOutput = (git -C $Root stash --include-untracked 2>&1) -join "`n"
+    $stashed = $stashOutput -notmatch 'No local changes'
 
+    # Use a flag so finally always runs - exit 1 inside try bypasses finally in PS
+    $publishErr = ""
     try {
         # Create or reset the mod branch from current HEAD
         git -C $Root checkout -B $Branch
-        if ($LASTEXITCODE -ne 0) { Write-Err "Could not create branch '$Branch'."; exit 1 }
+        if ($LASTEXITCODE -ne 0) { $publishErr = "Could not create branch '$Branch'."; return }
 
         # Force-add the mod folder (bypasses the workspace .gitignore)
         $relModPath = Join-Path "mods" $modName
         git -C $Root add --force $relModPath
-        if ($LASTEXITCODE -ne 0) { Write-Err "git add failed."; exit 1 }
+        if ($LASTEXITCODE -ne 0) { $publishErr = "git add failed."; return }
 
         # Also commit the current workspace.json so the branch records context
         git -C $Root add workspace.json 2>&1 | Out-Null
@@ -1121,7 +1186,7 @@ function Invoke-PublishMod {
             Write-Warn "Nothing to commit - mod branch is already up to date."
         } else {
             git -C $Root commit -m $commitMsg
-            if ($LASTEXITCODE -ne 0) { Write-Err "git commit failed."; exit 1 }
+            if ($LASTEXITCODE -ne 0) { $publishErr = "git commit failed."; return }
             Write-Success "Committed: $commitMsg"
         }
 
@@ -1134,12 +1199,12 @@ function Invoke-PublishMod {
             Write-Success "Pushed to $Remote/$Branch"
         }
     } finally {
-        # Always return to original branch
+        # Always return to original branch regardless of success or failure
         git -C $Root checkout $originalBranch 2>&1 | Out-Null
-        if ($stashed) {
-            git -C $Root stash pop 2>&1 | Out-Null
-        }
+        if ($stashed) { git -C $Root stash pop 2>&1 | Out-Null }
     }
+
+    if ($publishErr) { Write-Err $publishErr; exit 1 }
 
     Write-Host ""
     Write-Success "Done. Back on branch: $originalBranch"
@@ -1253,6 +1318,72 @@ function Invoke-Reset {
     }
 }
 
+# ─── add-dep-dll ──────────────────────────────────────────────────────────────
+function Invoke-AddDepDll {
+    param([string]$DepName, [string]$VsVersion, [string]$DllSource = "")
+
+    if (-not $DepName -or -not $VsVersion) {
+        Write-Err "Usage: add-dep-dll <dep-name> <vs-version> [dll-path]"
+        Write-Host ""
+        Write-Host "  Examples:"
+        Write-Host "    add-dep-dll CarryCapacity 1.21 C:\mods\CarryCapacity.dll"
+        Write-Host "    add-dep-dll CarryCapacity 1.21   <- searches game Mods folder automatically"
+        exit 1
+    }
+
+    $ws = Get-Workspace
+    $modName = $ws.targetMod
+    if (-not $modName) { Write-Err "No target mod set.  Run: use-mod <ModName>"; exit 1 }
+
+    $vsVer     = $VsVersion.TrimStart("v")
+    $modDir    = Join-Path (Join-Path $Root "mods") $modName
+    $depFolder = Join-Path (Join-Path $modDir "deps") "$DepName-$vsVer"
+
+    # ── Locate the DLL ────────────────────────────────────────────────────────
+    $dllPath = $DllSource
+
+    if (-not $dllPath) {
+        # Auto-discover: try the game's Mods folder
+        $rawGameDir = $ws.gameDirectory
+        if ($rawGameDir) {
+            $gameDir = [System.Environment]::ExpandEnvironmentVariables($rawGameDir)
+            $gameMods = Join-Path $gameDir "Mods"
+            if (Test-Path $gameMods) {
+                $found = @(Get-ChildItem $gameMods -ErrorAction SilentlyContinue |
+                           Where-Object { $_.Name -like "$DepName*.dll" -or
+                                          $_.Name -like "$($DepName.ToLower())*.dll" })
+                if ($found.Count -gt 0) {
+                    $dllPath = $found[0].FullName
+                    Write-Info "Found in game Mods: $($found[0].Name)"
+                }
+            }
+        }
+    }
+
+    if (-not $dllPath) {
+        Write-Err "Could not find '$DepName*.dll'."
+        Write-Info "Provide the path explicitly:"
+        Write-Info "  add-dep-dll $DepName $VsVersion C:\path\to\$DepName.dll"
+        Write-Info "Or check that gameDirectory is set correctly in workspace.json."
+        exit 1
+    }
+
+    if (-not (Test-Path $dllPath)) {
+        Write-Err "DLL not found at: $dllPath"
+        exit 1
+    }
+
+    New-Item -ItemType Directory -Path $depFolder -Force | Out-Null
+    Copy-Item $dllPath $depFolder -Force
+
+    $dllName = [System.IO.Path]::GetFileName($dllPath)
+    Write-Success "Copied $dllName -> mods\$modName\deps\$DepName-$vsVer\"
+    Write-Host ""
+    Write-Info "The DLL is now auto-referenced for VS $vsVer builds via the deps\ glob."
+    Write-Info "For named resolution with localSettings path override, ask Claude Code"
+    Write-Info "to add an explicit Reference and OverrideDir entry (like CODamageEffects)."
+}
+
 # ─── Router ───────────────────────────────────────────────────────────────────
 switch ($Command.ToLower()) {
     "build"          { Invoke-Build        (ArgAt $CmdArgs 0 "debug") }
@@ -1264,6 +1395,7 @@ switch ($Command.ToLower()) {
     "fetch-gamesrc"  { Invoke-FetchGameSrc (ArgAt $CmdArgs 0 "") (ArgAt $CmdArgs 1 "") }
     "list-gamesrc"   { Invoke-ListGameSrc }
     "add-dep"        { Invoke-AddDep       (ArgAt $CmdArgs 0 "") (ArgAt $CmdArgs 1 "") }
+    "add-dep-dll"    { Invoke-AddDepDll    (ArgAt $CmdArgs 0 "") (ArgAt $CmdArgs 1 "") (ArgAt $CmdArgs 2 "") }
     "remove-dep"     { Invoke-RemoveDep    (ArgAt $CmdArgs 0 "") }
     "add-example"    { Invoke-AddExample   (ArgAt $CmdArgs 0 "") (ArgAt $CmdArgs 1 "") }
     "remove-example" { Invoke-RemoveExample (ArgAt $CmdArgs 0 "") }

@@ -136,18 +136,67 @@ The workspace can hold clones of the game's own mod source repos under `gamesrc\
 
 ---
 
-## 📦 Step 3 — Learn from Dependencies & Examples
+## 📦 Step 3 — Dependencies & Examples
 
-### Dependencies (`dependencies\`)
-These are mods your target mod depends on at runtime. When building:
-- Inspect their `modinfo.json` for modid and version.
-- Study their public classes/interfaces so your mod can interact with them correctly.
-- If the dep ships a DLL, it should be placed in `mods\{targetMod}\deps\{depname}-{vsver}\` for the build system to auto-reference.
+### Source context (`dependencies\`)
+Mod source code added with `add-dep`. Claude Code reads this to understand a dependency's public API — its classes, methods, and mod ID — when writing code that calls it.
+
+- Inspect `modinfo.json` for modid and version requirements.
+- Study public classes and interfaces to call them correctly.
+- This is read-only context. It does **not** affect compilation.
+
+### Build-time DLL references
+
+To compile code that calls a dependency mod, the compiler needs that mod's DLL. The build system resolves dependency DLLs in three tiers, in this order:
+
+| Tier | Where | When it applies |
+|---|---|---|
+| 1 | `$(GameDirectory)/Mods/*.dll` | Dep is installed alongside the game |
+| 2 | `mods\{mod}\deps\{name}-{vsver}\*.dll` | Vendored DLL committed to the mod repo |
+| 3 | `mods\{mod}\external\*.dll` | Ad-hoc DLL for one-off use |
+
+**Adding a dep DLL:**
+```powershell
+# Auto-discovers the DLL from the game's Mods folder
+.\scripts\vs-workspace.ps1 add-dep-dll CarryCapacity 1.21
+
+# Explicit path
+.\scripts\vs-workspace.ps1 add-dep-dll CarryCapacity 1.21 C:\path\to\CarryCapacity.dll
+```
+
+**Named dep with full path control** (for mods that need the same resolution chain as CODamageEffects/overhaullib):
+
+When a dep needs a custom install path overrideable per machine via `localSettings.props`, add these three pieces to the mod's files:
+
+In `{Mod}_{vsver}.csproj`:
+```xml
+<PropertyGroup>
+    <CarryCapacityDir Condition="'$(CarryCapacityDir_1_21)' != ''">$(CarryCapacityDir_1_21)</CarryCapacityDir>
+    <CarryCapacityDir Condition="'$(CarryCapacityDir)' == ''">$(GameDirectory)/Mods/CarryCapacity</CarryCapacityDir>
+    <CarryCapacityDir Condition="'$(CarryCapacityDir)' == ''">$(MSBuildProjectDirectory)/deps/carrycapacity-1.21</CarryCapacityDir>
+</PropertyGroup>
+```
+
+In `Common.Build.targets` `<ItemGroup>` (after the game DLLs):
+```xml
+<Reference Include="CarryCapacity" HintPath="$(CarryCapacityDir)/CarryCapacity.dll" Private="false" />
+```
+
+In `Properties\localSettings.props.template`:
+```xml
+<!-- Optional: set if CarryCapacity is not in your game's Mods folder -->
+<!-- <CarryCapacityDir_1_21></CarryCapacityDir_1_21> -->
+```
+
+In `Directory.Build.props` `<Dependencies>`:
+```xml
+<Dependencies Include="carrycapacity" Version=">=1.0.0" />
+```
 
 ### Examples (`examples\`)
-These are reference mods showing patterns and conventions. When building:
+Reference mods showing patterns and conventions.
 - Study their project structure, asset layout, and code patterns.
-- Use them as templates for common patterns (blocks, items, entities, GUIs, world gen, etc.).
+- Use them as templates for common patterns (blocks, items, entities, GUIs, world gen).
 - Prefer patterns you see in examples over inventing new ones.
 
 ---

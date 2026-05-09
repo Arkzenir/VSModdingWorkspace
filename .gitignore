@@ -1,0 +1,26 @@
+# ================================================================
+# VS Modding Workspace — root .gitignore
+#
+# Tool files (CLAUDE.md, scripts/, README.md, workspace.json,
+# setup.bat, .vscode/, .claude/) are committed to main.
+#
+# Everything below is local working data managed by the script.
+# Re-populate after a fresh clone with:
+#   .\scripts\vs-workspace.ps1 init
+#   .\scripts\vs-workspace.ps1 fetch-api <version>
+#   .\scripts\vs-workspace.ps1 fetch-gamesrc essentials
+#   .\scripts\vs-workspace.ps1 fetch-gamesrc survival
+# ================================================================
+
+# Fetched API source (re-fetch with: fetch-api <version>)
+/api/
+
+# Fetched game source repos (re-fetch with: fetch-gamesrc <name>)
+/gamesrc/
+
+# Mod context source (re-add with: add-dep / add-example)
+/dependencies/
+/examples/
+
+# Active mod work (save to branch with: publish-mod / export-mod)
+/mods/
