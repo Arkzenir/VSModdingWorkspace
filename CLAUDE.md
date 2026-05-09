@@ -38,6 +38,27 @@ Before doing anything, read `workspace.json`. It tells you:
 > **Note:** `api\{version}\vsapi\` is **source code only** — no compiled DLLs. Build references
 > come from the game install (`gameDirectory`). The api source is for Claude Code to read types and interfaces.
 
+### Git workflow context
+
+This workspace lives in a git repo. Understanding the branch structure prevents accidental data loss:
+
+| Branch | Contains | Purpose |
+|---|---|---|
+| `main` | Tool files only (`CLAUDE.md`, `scripts\`, `workspace.json` neutral) | The clean, shareable workspace — never has mod code |
+| `mod/{modid}` | Tool files + `mods\{ModName}\` source | One branch per mod being developed |
+
+**`mods\` is gitignored on `main`** — the active mod folder is a local working directory until `publish-mod` is run. Never ask the user to commit mod files directly to main.
+
+**When work is complete**, tell the user to run:
+```powershell
+.\scripts\vs-workspace.ps1 publish-mod        # pushes to mod/{modid} branch
+.\scripts\vs-workspace.ps1 reset              # clears workspace.json back to neutral
+```
+Or for a standalone mod repo:
+```powershell
+.\scripts\vs-workspace.ps1 export-mod https://github.com/user/mymod.git
+```
+
 ---
 
 ## 🔍 Step 2 — Understand the Active API
@@ -140,25 +161,37 @@ mods\MyMod\
 ├── .gitignore
 ├── Directory.Build.props          ← Mod identity (name, id, version, description, side, authors)
 ├── Common.Build.targets           ← Shared MSBuild logic (imported by all .csproj files)
-├── MyMod_1.19.csproj              ← Per-VS-version build (thin — just version + path resolution)
-├── MyMod_1.20.csproj              ← Add one per supported VS version
+├── MyMod_1.21.csproj              ← Per-VS-version build (thin — just version + path resolution)
 ├── Properties\
 │   ├── localSettings.props.template  ← Committed — shows available path overrides
 │   └── localSettings.props           ← Gitignored — machine-specific game install paths
 ├── source\
 │   └── MyModModSystem.cs          ← ModSystem entry point (and other .cs files)
 ├── resources\
-│   └── assets\
-│       └── mymod\
-│           ├── blocktypes\
-│           ├── itemtypes\
-│           ├── entities\
-│           ├── recipes\
-│           ├── lang\
-│           │   └── en.json
-│           └── patches\
+│   ├── modicon.png                ← Optional: 32x32 PNG shown in the mod manager
+│   └── assets\mymod\
+│       ├── blocktypes\            ← Block JSON definitions
+│       ├── itemtypes\             ← Item JSON definitions
+│       ├── entities\              ← Entity JSON definitions
+│       ├── recipes\               ← Crafting, alloy, smithing, barrel, etc.
+│       ├── worldgen\              ← World generation config
+│       ├── config\                ← Mod config JSON files
+│       ├── patches\               ← JSON patches to vanilla content
+│       ├── lang\
+│       │   └── en.json
+│       ├── textures\              ← PNG texture files
+│       │   ├── block\             ← Block face textures
+│       │   ├── item\              ← Item textures
+│       │   ├── entity\            ← Entity skin textures
+│       │   └── gui\               ← GUI backgrounds, HUD icons
+│       ├── shapes\                ← VS JSON cube-model shape files
+│       │   ├── block\
+│       │   ├── item\
+│       │   └── entity\
+│       ├── sounds\                ← OGG sound files
+│       └── music\                 ← OGG music tracks
 ├── deps\
-│   └── somedep-1.19\              ← Vendored dep DLL for fallback (per VS version)
+│   └── somedep-1.21\              ← Vendored dep DLL for fallback (per VS version)
 └── external\                      ← Ad-hoc DLLs auto-referenced by Common.Build.targets
 ```
 
@@ -167,6 +200,46 @@ mods\MyMod\
 >
 > **Assets are symlinked** from `resources\assets\` into the build output.
 > Asset edits are immediately visible to the game without rebuilding.
+>
+> **modicon.png** (optional): place a 32x32 PNG at `resources\modicon.png`.
+> The build copies it to the mod output root automatically — no extra config needed.
+
+---
+
+## 🖼️ Asset Reference
+
+### Textures (`textures/`)
+
+PNG files. Referenced in block/item/entity JSON by path relative to `textures/`, no extension:
+```json
+"texture":  { "base": "block/stone/granite" }
+"textures": { "wool": { "base": "block/cloth/wool" }, "seam": { "base": "item/seam" } }
+```
+To reference vanilla textures, prefix with `game:`: `"base": "game:block/metal/copper"`.
+
+### Shapes (`shapes/`)
+
+VS uses its own JSON cube-model format — not FBX or OBJ. Referenced by path, no extension:
+```json
+"shape": { "base": "block/stone/granite" }
+```
+Author shapes with [Blockbench](https://www.blockbench.net/) (install the VS plugin) or the in-game model editor (`G` key in creative mode). Simple flat items render from their texture alone — no shape file needed.
+
+### Sounds (`sounds/`)
+
+OGG files. Referenced by path, no extension:
+```json
+"sounds": { "place": "block/stone", "break": "block/stone", "walk": "walk/stone" }
+```
+To reference game sounds, prefix with `game:`: `"place": "game:block/anvil"`.
+
+### GUI textures (`textures/gui/`)
+
+Used for custom dialog backgrounds, HUD overlays, and inventory icons. Reference by path like any other texture: `"gui/mydialog-bg"`. Map icons go under `textures/icons/worldmap/` as PNG or SVG.
+
+### `modicon.png`
+
+32×32 PNG displayed in the VS mod manager. Place it at `resources/modicon.png` — the build copies it to the output root automatically. No `iconpath` entry in `modinfo.json` is needed.
 
 ---
 

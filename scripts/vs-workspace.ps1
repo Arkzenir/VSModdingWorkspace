@@ -481,16 +481,55 @@ function Invoke-NewMod {
     # ── Directory structure ────────────────────────────────────────────────────
     @(
         "source",
+        # JSON definitions
         "resources\assets\$modId\blocktypes",
         "resources\assets\$modId\itemtypes",
         "resources\assets\$modId\entities",
         "resources\assets\$modId\recipes",
+        "resources\assets\$modId\worldgen",
+        "resources\assets\$modId\config",
         "resources\assets\$modId\lang",
         "resources\assets\$modId\patches",
+        # Textures (.png)
+        "resources\assets\$modId\textures\block",
+        "resources\assets\$modId\textures\item",
+        "resources\assets\$modId\textures\entity",
+        "resources\assets\$modId\textures\gui",
+        # 3D shapes (.json, VS cube-model format)
+        "resources\assets\$modId\shapes\block",
+        "resources\assets\$modId\shapes\item",
+        "resources\assets\$modId\shapes\entity",
+        # Sounds (.ogg) and music
+        "resources\assets\$modId\sounds",
+        "resources\assets\$modId\music",
+        # Build helpers
         "Properties",
         "deps",
         "external"
     ) | ForEach-Object { New-Item -ItemType Directory -Path (Join-Path $dest $_) -Force | Out-Null }
+
+    # ── .gitkeep - keep empty asset dirs tracked in git ──────────────────────
+    @(
+        "resources\assets\$modId\blocktypes",
+        "resources\assets\$modId\itemtypes",
+        "resources\assets\$modId\entities",
+        "resources\assets\$modId\recipes",
+        "resources\assets\$modId\worldgen",
+        "resources\assets\$modId\config",
+        "resources\assets\$modId\patches",
+        "resources\assets\$modId\textures\block",
+        "resources\assets\$modId\textures\item",
+        "resources\assets\$modId\textures\entity",
+        "resources\assets\$modId\textures\gui",
+        "resources\assets\$modId\shapes\block",
+        "resources\assets\$modId\shapes\item",
+        "resources\assets\$modId\shapes\entity",
+        "resources\assets\$modId\sounds",
+        "resources\assets\$modId\music"
+    ) | ForEach-Object {
+        $gk = Join-Path $dest "$_\.gitkeep"
+        if (-not (Test-Path $gk)) { "" | Set-Content $gk -Encoding UTF8 }
+    }
 
     # ── .gitignore ─────────────────────────────────────────────────────────────
     @"
@@ -634,6 +673,18 @@ Properties/localSettings.props
           Command="mklink /D &quot;`$(OutputPath)\assets&quot; &quot;`$(AssetsDir)&quot;" />
     <Exec Condition="'`$(OS)' != 'Windows_NT'"
           Command="ln -sf &quot;`$(AssetsDir)&quot; &quot;`$(OutputPath)/assets&quot;" />
+  </Target>
+
+  <!--
+    Copy modicon.png to the output root if it exists.
+    Place a 32x32 PNG at resources/modicon.png - VS displays it in the mod manager.
+    Optional: the build succeeds silently if the file is absent.
+  -->
+  <Target Name="CopyModIcon" AfterTargets="LinkAssets" BeforeTargets="Build">
+    <Copy SourceFiles="`$(ProjectDir)/resources/modicon.png"
+          DestinationFolder="`$(OutputPath)"
+          Condition="Exists('`$(ProjectDir)/resources/modicon.png')"
+          SkipUnchangedFiles="true" />
   </Target>
 
   <!--
