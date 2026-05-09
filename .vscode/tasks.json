@@ -3,21 +3,35 @@
     "tasks": [
 
         // ── Build ────────────────────────────────────────────────────────────
-        // Ctrl+Shift+B runs the default build task (WS: Build Debug)
+        // Ctrl+Shift+B triggers the default build task (WS: Build Debug).
+        // $msCompile surfaces compiler errors in the Problems panel (Ctrl+Shift+M).
+        // Each build runs in a dedicated terminal that clears on every run.
         {
             "label": "WS: Build Debug",
             "type": "shell",
-            "command": ".\\scripts\\vs-workspace.ps1 build",
+            "command": "& '${workspaceFolder}\\scripts\\vs-workspace.ps1' build",
+            "options": {
+                "shell": {
+                    "executable": "powershell.exe",
+                    "args": ["-ExecutionPolicy", "Bypass", "-Command"]
+                }
+            },
             "group": { "kind": "build", "isDefault": true },
-            "presentation": { "reveal": "always", "panel": "shared", "clear": true },
+            "presentation": { "reveal": "always", "panel": "dedicated", "clear": true },
             "problemMatcher": "$msCompile"
         },
         {
             "label": "WS: Build Release",
             "type": "shell",
-            "command": ".\\scripts\\vs-workspace.ps1 build release",
+            "command": "& '${workspaceFolder}\\scripts\\vs-workspace.ps1' build release",
+            "options": {
+                "shell": {
+                    "executable": "powershell.exe",
+                    "args": ["-ExecutionPolicy", "Bypass", "-Command"]
+                }
+            },
             "group": "build",
-            "presentation": { "reveal": "always", "panel": "shared", "clear": true },
+            "presentation": { "reveal": "always", "panel": "dedicated", "clear": true },
             "problemMatcher": "$msCompile"
         },
 
@@ -25,80 +39,154 @@
         {
             "label": "WS: New Mod",
             "type": "shell",
-            "command": ".\\scripts\\vs-workspace.ps1 new-mod '${input:newModName}'",
-            "presentation": { "reveal": "always", "panel": "shared" }
+            "command": "& '${workspaceFolder}\\scripts\\vs-workspace.ps1' new-mod '${input:newModName}'",
+            "options": {
+                "shell": {
+                    "executable": "powershell.exe",
+                    "args": ["-ExecutionPolicy", "Bypass", "-Command"]
+                }
+            },
+            "presentation": { "reveal": "always", "panel": "dedicated" }
         },
         {
             "label": "WS: Import Mod",
             "type": "shell",
-            "command": ".\\scripts\\vs-workspace.ps1 import-mod '${input:importModSource}'",
-            "presentation": { "reveal": "always", "panel": "shared" }
+            "command": "& '${workspaceFolder}\\scripts\\vs-workspace.ps1' import-mod '${input:importModSource}'",
+            "options": {
+                "shell": {
+                    "executable": "powershell.exe",
+                    "args": ["-ExecutionPolicy", "Bypass", "-Command"]
+                }
+            },
+            "presentation": { "reveal": "always", "panel": "dedicated" }
         },
         {
             "label": "WS: Set Active Mod",
             "type": "shell",
-            "command": ".\\scripts\\vs-workspace.ps1 use-mod '${input:useModName}'",
-            "presentation": { "reveal": "silent", "panel": "shared" }
+            "command": "& '${workspaceFolder}\\scripts\\vs-workspace.ps1' use-mod '${input:useModName}'",
+            "options": {
+                "shell": {
+                    "executable": "powershell.exe",
+                    "args": ["-ExecutionPolicy", "Bypass", "-Command"]
+                }
+            },
+            "presentation": { "reveal": "silent", "panel": "dedicated" }
         },
         {
             "label": "WS: List Mods",
             "type": "shell",
-            "command": ".\\scripts\\vs-workspace.ps1 list-mods",
-            "presentation": { "reveal": "always", "panel": "shared" }
+            "command": "& '${workspaceFolder}\\scripts\\vs-workspace.ps1' list-mods",
+            "options": {
+                "shell": {
+                    "executable": "powershell.exe",
+                    "args": ["-ExecutionPolicy", "Bypass", "-Command"]
+                }
+            },
+            "presentation": { "reveal": "always", "panel": "dedicated" }
         },
 
         // ── API and game source ──────────────────────────────────────────────
         {
             "label": "WS: Fetch API Version",
             "type": "shell",
-            "command": ".\\scripts\\vs-workspace.ps1 fetch-api ${input:apiVersion}",
-            "presentation": { "reveal": "always", "panel": "shared" }
+            "command": "& '${workspaceFolder}\\scripts\\vs-workspace.ps1' fetch-api '${input:apiVersion}'",
+            "options": {
+                "shell": {
+                    "executable": "powershell.exe",
+                    "args": ["-ExecutionPolicy", "Bypass", "-Command"]
+                }
+            },
+            "presentation": { "reveal": "always", "panel": "dedicated" }
         },
         {
             "label": "WS: Fetch Game Source (Essentials)",
             "type": "shell",
-            "command": ".\\scripts\\vs-workspace.ps1 fetch-gamesrc essentials",
-            "presentation": { "reveal": "always", "panel": "shared" }
+            "command": "& '${workspaceFolder}\\scripts\\vs-workspace.ps1' fetch-gamesrc essentials '${input:gameSrcVersion}'",
+            "options": {
+                "shell": {
+                    "executable": "powershell.exe",
+                    "args": ["-ExecutionPolicy", "Bypass", "-Command"]
+                }
+            },
+            "presentation": { "reveal": "always", "panel": "dedicated" }
         },
         {
             "label": "WS: Fetch Game Source (Survival)",
             "type": "shell",
-            "command": ".\\scripts\\vs-workspace.ps1 fetch-gamesrc survival",
-            "presentation": { "reveal": "always", "panel": "shared" }
+            "command": "& '${workspaceFolder}\\scripts\\vs-workspace.ps1' fetch-gamesrc survival '${input:gameSrcVersion}'",
+            "options": {
+                "shell": {
+                    "executable": "powershell.exe",
+                    "args": ["-ExecutionPolicy", "Bypass", "-Command"]
+                }
+            },
+            "presentation": { "reveal": "always", "panel": "dedicated" }
         },
 
         // ── Git workflow ─────────────────────────────────────────────────────
         {
-            "label": "WS: Publish Mod (branch in this repo)",
+            "label": "WS: Publish Mod",
             "type": "shell",
-            "command": ".\\scripts\\vs-workspace.ps1 publish-mod",
-            "presentation": { "reveal": "always", "panel": "shared" }
+            "command": "& '${workspaceFolder}\\scripts\\vs-workspace.ps1' publish-mod",
+            "options": {
+                "shell": {
+                    "executable": "powershell.exe",
+                    "args": ["-ExecutionPolicy", "Bypass", "-Command"]
+                }
+            },
+            "presentation": { "reveal": "always", "panel": "dedicated" }
         },
         {
             "label": "WS: Export Mod (standalone repo)",
             "type": "shell",
-            "command": ".\\scripts\\vs-workspace.ps1 export-mod '${input:exportRemoteUrl}'",
-            "presentation": { "reveal": "always", "panel": "shared" }
+            "command": "& '${workspaceFolder}\\scripts\\vs-workspace.ps1' export-mod '${input:exportRemoteUrl}'",
+            "options": {
+                "shell": {
+                    "executable": "powershell.exe",
+                    "args": ["-ExecutionPolicy", "Bypass", "-Command"]
+                }
+            },
+            "presentation": { "reveal": "always", "panel": "dedicated" }
         },
         {
             "label": "WS: Reset Workspace",
             "type": "shell",
-            "command": ".\\scripts\\vs-workspace.ps1 reset",
-            "presentation": { "reveal": "always", "panel": "shared" }
+            "command": "& '${workspaceFolder}\\scripts\\vs-workspace.ps1' reset",
+            "options": {
+                "shell": {
+                    "executable": "powershell.exe",
+                    "args": ["-ExecutionPolicy", "Bypass", "-Command"]
+                }
+            },
+            "presentation": { "reveal": "always", "panel": "dedicated" }
         },
+        // Publish then Reset in sequence.
+        // Reset only runs if Publish succeeds ($LASTEXITCODE -eq 0).
         {
-            "label": "WS: Publish and Reset (full end-of-session)",
+            "label": "WS: Publish and Reset",
             "type": "shell",
-            "command": ".\\scripts\\vs-workspace.ps1 publish-mod; .\\scripts\\vs-workspace.ps1 reset",
-            "presentation": { "reveal": "always", "panel": "shared" }
+            "command": "& '${workspaceFolder}\\scripts\\vs-workspace.ps1' publish-mod; if ($LASTEXITCODE -eq 0) { & '${workspaceFolder}\\scripts\\vs-workspace.ps1' reset } else { Write-Host 'Publish failed - workspace not reset.' -ForegroundColor Red }",
+            "options": {
+                "shell": {
+                    "executable": "powershell.exe",
+                    "args": ["-ExecutionPolicy", "Bypass", "-Command"]
+                }
+            },
+            "presentation": { "reveal": "always", "panel": "dedicated" }
         },
 
         // ── Workspace info ───────────────────────────────────────────────────
         {
             "label": "WS: Status",
             "type": "shell",
-            "command": ".\\scripts\\vs-workspace.ps1 status",
-            "presentation": { "reveal": "always", "panel": "shared" }
+            "command": "& '${workspaceFolder}\\scripts\\vs-workspace.ps1' status",
+            "options": {
+                "shell": {
+                    "executable": "powershell.exe",
+                    "args": ["-ExecutionPolicy", "Bypass", "-Command"]
+                }
+            },
+            "presentation": { "reveal": "always", "panel": "dedicated" }
         }
     ],
 
@@ -126,7 +214,12 @@
         {
             "id": "exportRemoteUrl",
             "type": "promptString",
-            "description": "Remote git URL for standalone repo (leave empty to only init locally)"
+            "description": "Remote git URL (leave empty to only initialise locally)"
+        },
+        {
+            "id": "gameSrcVersion",
+            "type": "promptString",
+            "description": "Version to check out, e.g. 1.21.5 (leave empty for latest master)"
         }
     ]
 }

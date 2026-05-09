@@ -1,0 +1,12 @@
+{
+    // Use PowerShell as the integrated terminal on Windows.
+    // This ensures manual commands typed in the VS Code terminal work the same
+    // as the tasks defined in tasks.json.
+    "terminal.integrated.defaultProfile.windows": "PowerShell",
+    "terminal.integrated.profiles.windows": {
+        "PowerShell": {
+            "source": "PowerShell",
+            "args": ["-ExecutionPolicy", "Bypass"]
+        }
+    }
+}
