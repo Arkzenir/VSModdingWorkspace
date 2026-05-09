@@ -1,0 +1,14 @@
+{
+    "recommendations": [
+        // C# language support and .NET build integration
+        "ms-dotnettools.csharp",
+        // C# dev kit (solution explorer, test runner)
+        "ms-dotnettools.csdevkit",
+        // PowerShell script editing and IntelliSense
+        "ms-vscode.powershell",
+        // Git history graph and branch visualisation
+        "mhutchie.git-graph",
+        // Inline git blame and history
+        "eamodio.gitlens"
+    ]
+}

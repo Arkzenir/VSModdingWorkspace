@@ -1,0 +1,22 @@
+﻿{
+    "_comment":  "Edit this file to switch API versions, add dependencies, or change the active mod. Run \u0027vs-workspace.ps1 status\u0027 to validate.",
+    "gameVersion":  "1.21.5",
+    "apiVersion":  "1.21.5",
+    "dotnetTarget":  "net8.0",
+    "targetMod":  null,
+    "gameDirectory":  "E:\\VSLauncher\\VSLGameVersions\\1.21.5",
+    "dependencies":  [
+                        "overhaullib-1.21",
+                        "overhaullib-1.22"
+                     ],
+    "examples":  [
+
+                 ],
+    "_notes":  {
+                   "apiVersion":  "Must match a folder name under api\\ â€” run \u0027vs-workspace.ps1 fetch-api \u003cversion\u003e\u0027 to add one.",
+                   "targetMod":  "Set to the folder name under mods\\ that you want Claude Code to build/edit.",
+                   "gameDirectory":  "Your Vintage Story install folder. Pre-filled into new mods\u0027 localSettings.props. Also accepts version-specific env vars (VINTAGE_STORY_1_21, etc.).",
+                   "dependencies":  "List folder names under dependencies\\ that Claude Code should read for context.",
+                   "examples":  "List folder names under examples\\ that Claude Code should study for patterns."
+               }
+}
