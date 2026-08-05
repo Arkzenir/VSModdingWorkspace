@@ -129,6 +129,37 @@ foreach ($name in (Get-SubdirNames $WorkspacesDir)) {
 }
 Write-EntityFile "workspaces.json" $workspaceRows
 
+# ── active.json ───────────────────────────────────────────────────────────────
+# Zero or one row. Drives the live summary panel at the top of the Workbench
+# dashboard - entity files are watched, so this updates without a page reload.
+$activeRows = @()
+if ($activeName -and $null -ne $activeWsJson) {
+    $deps     = @(Get-Prop $activeWsJson "dependencies" @())
+    $examples = @(Get-Prop $activeWsJson "examples" @())
+    $gameDir  = [string](Get-Prop $activeWsJson "gameDirectory" "")
+    if (-not $gameDir) { $gameDir = [string](Get-Prop $harness "gameDirectory" "(unset)") }
+
+    $releaseDir = Join-Path (Join-Path (Join-Path $WorkspacesDir $activeName) "mod") "Releases"
+    $releases   = @(Get-ChildItem $releaseDir -Filter *.zip -ErrorAction SilentlyContinue |
+                    Sort-Object LastWriteTime -Descending)
+
+    $activeRows += [PSCustomObject]@{
+        name         = $activeName
+        modId        = [string](Get-Prop $activeWsJson "modId" "")
+        modVersion   = [string](Get-Prop $activeWsJson "modVersion" "")
+        apiVersion   = [string](Get-Prop $activeWsJson "apiVersion" "?")
+        gameVersion  = [string](Get-Prop $activeWsJson "gameVersion" "?")
+        dotnetTarget = [string](Get-Prop $activeWsJson "dotnetTarget" "")
+        gameDir      = $gameDir
+        depList      = $(if ($deps.Count)     { ($deps -join ", ") }     else { "none" })
+        exampleList  = $(if ($examples.Count) { ($examples -join ", ") } else { "none" })
+        lastRelease  = $(if ($releases.Count) { $releases[0].Name } else { "none built" })
+        lastReleaseAt= $(if ($releases.Count) { $releases[0].LastWriteTime.ToString("yyyy-MM-dd HH:mm") } else { "" })
+        modPath      = (Join-Path (Join-Path $WorkspacesDir $activeName) "mod")
+    }
+}
+Write-EntityFile "active.json" $activeRows
+
 # ── apis.json ─────────────────────────────────────────────────────────────────
 $activeApi = ""
 if ($null -ne $activeWsJson) { $activeApi = [string](Get-Prop $activeWsJson "apiVersion" "") }
@@ -183,6 +214,15 @@ foreach ($kind in @("api", "gamesrc", "dependencies", "examples")) {
     }
 }
 Write-EntityFile "cacheitems.json" $cacheRows
+
+# ── picked.json ───────────────────────────────────────────────────────────────
+# Owned by vsmod-pick.ps1, not by this script. Created empty if absent so that
+# OliveTin has a file to attach its watcher to on a cold start.
+$picked = Join-Path $OutDir "picked.json"
+if (-not (Test-Path $picked)) {
+    [System.IO.File]::WriteAllText($picked, "", [System.Text.UTF8Encoding]::new($false))
+    Write-Host ("  {0,-18} created empty" -f "picked.json")
+}
 
 Write-Host ""
 exit 0
