@@ -1,0 +1,15 @@
+{
+  "_readme": "Copy to harness.json (or let 'init' do it) and edit. Machine-level settings shared by every workspace. Per-mod settings live in workspaces/<Name>/workspace.json.",
+
+  "gameDirectory": "C:\\Program Files\\Vintagestory",
+  "author": "Author",
+  "exportDirectory": "",
+
+  "defaults": {
+    "gameVersion": "1.21.5",
+    "apiVersion": "1.21.5",
+    "dotnetTarget": "net8.0"
+  },
+
+  "activeWorkspace": null
+}

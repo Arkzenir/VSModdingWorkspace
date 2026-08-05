@@ -1,6 +1,11 @@
-# VS Modding Workspace
+# Vintage Story Modding Harness
 
-A Claude Code workspace for building Vintage Story mods on Windows. The workspace itself lives on `main` and stays clean — all mod work happens on branches or in separate repos, and the workspace resets between projects.
+A workspace for building Vintage Story mods with any coding agent. Every mod gets its
+own isolated workspace; everything downloaded is shared between them. Switching mods
+is one command and re-downloads nothing.
+
+This harness **develops** mods. It never publishes them — when a mod is ready you copy
+its folder out, which is already a complete git repo, and push it wherever you like.
 
 ---
 
@@ -8,370 +13,359 @@ A Claude Code workspace for building Vintage Story mods on Windows. The workspac
 
 | Tool | Why |
 |---|---|
-| [Git for Windows](https://git-scm.com/download/win) | Cloning API source and mod repos |
-| [.NET SDK 7 or 8](https://dotnet.microsoft.com/download) | Compiling mods (`net7.0` for VS ≤1.21, `net8.0` for ≥1.22) |
-| [Vintage Story](https://www.vintagestory.at/) | Game DLLs are required for compilation |
-| [VS Code](https://code.visualstudio.com/) + [Claude Code](https://claude.ai/download) | The development environment |
-| PowerShell 5.1 | Already built into Windows 10/11 |
+| [Git](https://git-scm.com/downloads) | Fetching API and game source; each mod is a repo |
+| [.NET SDK 7 or 8](https://dotnet.microsoft.com/download) | Compiling (`net7.0` for VS ≤1.20, `net8.0` for ≥1.21) |
+| [Vintage Story](https://www.vintagestory.at/) | The game DLLs are required to compile against |
+| PowerShell 5.1+ | Built into Windows 10/11. On Linux/macOS install [PowerShell 7](https://github.com/PowerShell/PowerShell) |
+| A coding agent | Claude Code, OpenCode, Goose, Cursor, Codex, Gemini CLI — any of them |
 
 ---
 
-## First-time setup
+## Setup
 
-### Step 1 — Unblock and initialise
+**Windows:** double-click `setup.bat`.
+**Anywhere else:** `pwsh ./setup.ps1`
 
-**Double-click `setup.bat`.**
+That unblocks the scripts, checks your prerequisites, creates `harness.json`, and
+builds the folder structure. Then:
 
-This handles two things Windows blocks by default — script execution policy and the "downloaded from internet" file mark — then creates the workspace folder structure. No terminal needed.
-
-> **If `setup.bat` fails,** open PowerShell and run these manually:
-> ```powershell
-> Unblock-File .\scripts\vs-workspace.ps1
-> Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-> .\scripts\vs-workspace.ps1 init
-> ```
-
-### Step 2 — Open in VS Code and install extensions
-
-Open the workspace folder in VS Code. When prompted to install recommended extensions, accept. This gives you C# IntelliSense, PowerShell syntax support, and git graph tooling.
-
-### Step 3 — Fetch reference sources
-
-Run these tasks from VS Code (`Ctrl+Shift+P` → **Run Task**):
-
-| Task | What it fetches |
-|---|---|
-| `WS: Fetch API Version` | vsapi source — Claude Code reads this to understand the modding API. Enter your game version, e.g. `1.21.5` |
-| `WS: Fetch Game Source (Essentials)` | vsessentialsmod — vanilla core systems (player, weather, trading) |
-| `WS: Fetch Game Source (Survival)` | vssurvivalmod — vanilla content (blocks, items, world gen) |
-
-These clone from GitHub and check out the commit closest to your requested version. The vsapi and game source repos have no release tags — version matching works by searching commit history.
-
-### Step 4 — Configure your game path
-
-Open `workspace.json` and set `gameDirectory` to your Vintage Story install folder:
-
-```json
-"gameDirectory": "C:\\Program Files\\Vintagestory"
-```
-
-This is used when scaffolding new mods — it pre-fills `Properties\localSettings.props` with your game path so the build system can find the game DLLs.
-
----
-
-## Daily workflow
-
-### Starting a new mod
-
-1. `Ctrl+Shift+P` → **`WS: New Mod`** → enter a PascalCase name (e.g. `GlowingMushroom`)
-2. Open Claude Code
-3. Type `/new-mod GlowingMushroom` — Claude Code scaffolds the project and asks what to build
-4. Describe the mod — Claude Code writes the code
-
-### Working on an existing mod
-
-1. `Ctrl+Shift+P` → **`WS: Import Mod`** → enter a local folder path, `.zip` path, or git URL
-2. The script inspects the mod's structure and sets it as the active target
-3. Open Claude Code and describe what to change, fix, or add
-
-### Building
-
-| What | How |
-|---|---|
-| Debug build | `Ctrl+Shift+B` |
-| Release build + distributable zip | `Ctrl+Shift+P` → `WS: Build Release` |
-
-**Debug output** lands in `mods\YourMod\bin\Debug\{vsver}\Mods\{modid}\`. Add this `Mods\` folder to your game's ModPaths in `clientsettings.json` and asset edits are live without rebuilding — only C# changes require a recompile.
-
-**Release output** lands in `mods\YourMod\Releases\{modid}_{version}_vs{vsver}.zip`, ready to upload to the VS mod portal.
-
-### Ending a session
-
-`Ctrl+Shift+P` → **`WS: Publish and Reset`**
-
-This commits the mod source to a `mod/{modid}` branch, pushes it, and clears `workspace.json` back to its neutral state — ready for the next project. Reset only runs if Publish succeeds.
-
-> **For a standalone repo instead of a branch:**
-> `Ctrl+Shift+P` → **`WS: Export Mod (standalone repo)`** → enter a git remote URL
-
-### Resuming work on a previously published mod
+1. Edit `harness.json` and set `gameDirectory` to your Vintage Story install.
+2. Download the reference sources once — they are shared by every mod you ever make:
 
 ```powershell
-git checkout mod/mymod
+.\scripts\vsmod.ps1 fetch-api 1.21.5
+.\scripts\vsmod.ps1 fetch-gamesrc essentials
+.\scripts\vsmod.ps1 fetch-gamesrc survival
 ```
-Then `Ctrl+Shift+P` → **`WS: Set Active Mod`** → enter the mod name.
+
+3. Open your agent in this folder. It picks up `AGENTS.md` on its own.
 
 ---
 
-## Claude Code slash commands
+## Daily use
 
-Type these in Claude Code to start a workflow without writing a full prompt. Arguments go after the command name.
+### Start a new mod
 
-| Command | Does |
+```powershell
+.\scripts\vsmod.ps1 new GlowingMushroom
+```
+
+Creates `workspaces/GlowingMushroom/`, scaffolds the project, and initialises
+`mod/` as a git repo with an initial commit on `main`. Then tell your agent what to
+build, or run its `/new-mod` command.
+
+### Bring in an existing mod
+
+```powershell
+.\scripts\vsmod.ps1 import https://github.com/someone/TheirMod.git
+.\scripts\vsmod.ps1 import C:\dev\MyOldMod
+.\scripts\vsmod.ps1 import C:\downloads\SomeMod.zip
+```
+
+Same result as `new`: a workspace with a git-backed `mod/` folder, made active. Git
+history is preserved when there is any, so a fork stays a fork. When there is none, a
+repo is initialised. The importer reports the mod's id, version, build system and
+layout so your agent knows what it is dealing with.
+
+### Switch between mods
+
+```powershell
+.\scripts\vsmod.ps1 list
+.\scripts\vsmod.ps1 use AnotherMod
+```
+
+Instant. Nothing is downloaded, copied, moved or reconfigured — the API source, game
+source, dependencies and examples are shared from `cache/` and simply relinked.
+
+### Build
+
+```powershell
+.\scripts\vsmod.ps1 build            # debug
+.\scripts\vsmod.ps1 build release    # release + distributable zip
+```
+
+**Debug** lands in `mod/bin/Debug/{vsver}/Mods/{modid}/`. Add the `Mods/` folder above
+it to your game's ModPaths in `clientsettings.json` and asset edits go live without
+rebuilding — only C# changes need a recompile.
+
+**Release** lands in `mod/Releases/{modid}_{version}_vs{vsver}.zip`, ready for the
+mod portal.
+
+### Publish (by hand, deliberately)
+
+```powershell
+.\scripts\vsmod.ps1 export
+```
+
+Copies the mod repo to `exports/{Name}/`, minus build output and your local settings.
+It is a complete git repo with full history and no remote. Publish it yourself:
+
+```powershell
+cd exports\GlowingMushroom
+git remote add origin https://github.com/you/glowing-mushroom.git
+git push -u origin main
+```
+
+Nothing in this harness ever pushes, adds a remote, or opens a PR, and `AGENTS.md`
+instructs agents not to either. Local commits inside `mod/` are fine and encouraged.
+
+---
+
+## How it is laid out
+
+```
+harness-root/
+├── AGENTS.md                  Instructions for every agent  <- the real one
+├── CLAUDE.md, GEMINI.md,      Pointers to AGENTS.md, for agents that
+│   .goosehints, .cursorrules,   look for their own filename
+│   .windsurfrules, .github/copilot-instructions.md
+├── harness.json               Your machine settings + which workspace is active
+├── scripts/vsmod.ps1          The whole CLI
+├── prompts/                   Reusable task prompts (agent-neutral)
+├── cache/                     Downloaded ONCE, shared by every workspace
+│   ├── api/{version}/vsapi/
+│   ├── gamesrc/{name}/
+│   ├── dependencies/{name}/
+│   └── examples/{name}/
+└── workspaces/
+    ├── GlowingMushroom/
+    │   ├── workspace.json     This mod's own settings
+    │   ├── mod/               THE MOD — a standalone git repo
+    │   ├── api/           →   link into cache/api/1.21.5
+    │   ├── gamesrc/       →   links into cache/gamesrc
+    │   ├── dependencies/  →   links into cache/dependencies
+    │   └── examples/      →   links into cache/examples
+    └── AnotherMod/            Fully independent — its own API version, deps, examples
+```
+
+`api/`, `gamesrc/`, `dependencies/` and `examples/` are directory junctions on Windows
+and symlinks elsewhere. Junctions were chosen deliberately: unlike symlinks they need
+no administrator rights and no developer mode.
+
+The consequence worth understanding: **two workspaces can target different game
+versions at the same time.** One mod on 1.20.4 and another on 1.21.5 coexist happily,
+each pointing at its own cached API source, with a single copy of each on disk.
+
+### Config split
+
+`harness.json` holds what belongs to your machine:
+
+```json
+{
+  "gameDirectory": "C:\\Program Files\\Vintagestory",
+  "author": "Author",
+  "exportDirectory": "",
+  "defaults": { "gameVersion": "1.21.5", "apiVersion": "1.21.5", "dotnetTarget": "net8.0" },
+  "activeWorkspace": "GlowingMushroom"
+}
+```
+
+`workspaces/{Name}/workspace.json` holds what belongs to that mod — `modName`, `modId`,
+`modVersion`, `gameVersion`, `apiVersion`, `dotnetTarget`, plus its `dependencies`,
+`examples` and `gamesrc` lists. Its `gameDirectory` is an optional override; leave it
+empty to inherit from `harness.json`.
+
+`defaults` seeds new workspaces only. Changing it never disturbs existing mods.
+
+---
+
+## Agent support
+
+`AGENTS.md` is the single source of truth. It is [the cross-tool open
+standard](https://agents.md/), read natively by OpenCode, Goose, Codex, Cursor, Jules
+and others. Every other instruction file here is a short pointer back to it rather than
+a copy, because duplicated instructions drift apart and start contradicting each other.
+
+If your agent reads some other filename, add a pointer file of your own — three lines
+saying "read AGENTS.md" is all it needs.
+
+### Task prompts
+
+`prompts/` holds plain-markdown task prompts usable with any agent: paste one in, or
+invoke it through your agent's command system.
+
+| Prompt | Purpose |
 |---|---|
-| `/new-mod MyMod` | Scaffolds the project (if not already done), then asks what to build |
-| `/add-feature <description>` | Adds a feature following Task Mode A — reads the API source, checks vanilla patterns, writes code |
-| `/fix <description or log>` | Diagnoses and fixes a bug following Task Mode B — reads all source first, finds root cause, makes minimal change |
-| `/port 1.21.5` | Ports the active mod to a different VS version — creates new csproj, fixes API breaking changes |
-| `/publish` | Runs `publish-mod` then `reset`, reports what branch was saved |
-| `/status` | Summarises current workspace state and session progress |
+| `new-mod.md` | Scaffold a mod and start building it |
+| `import-mod.md` | Import an existing mod and understand it before changing it |
+| `add-feature.md` | Add a feature, reading the API and vanilla source first |
+| `fix.md` | Diagnose a bug from a log, fix it minimally |
+| `port.md` | Port to another game version, finding breaking changes |
+| `switch.md` | Change workspace and re-orient |
+| `status.md` | Summarise the session |
 
-Commands are defined in `.claude/commands/` as markdown files — edit them to adjust the default workflow prompts.
-
----
-
-## VS Code tasks
-
-All workspace commands are available via `Ctrl+Shift+P` → **Run Task** → type `WS:`. Tasks that need input (mod name, version) show a native VS Code prompt box.
-
-| Task | What it does |
-|---|---|
-| **`WS: Build Debug`** | Compile — also `Ctrl+Shift+B` |
-| **`WS: Build Release`** | Compile + produce release zip in `Releases\` |
-| **`WS: New Mod`** | Prompt for name, scaffold full project |
-| **`WS: Import Mod`** | Prompt for source, import and inspect |
-| **`WS: Set Active Mod`** | Switch `targetMod` in workspace.json |
-| **`WS: List Mods`** | Show all mods in `mods\` |
-| **`WS: Fetch API Version`** | Prompt for version, clone vsapi source |
-| **`WS: Fetch Game Source (Essentials)`** | Clone vsessentialsmod |
-| **`WS: Fetch Game Source (Survival)`** | Clone vssurvivalmod |
-| **`WS: Publish Mod`** | Commit mod to branch and push |
-| **`WS: Publish and Reset`** | Publish then reset — full end-of-session |
-| **`WS: Export Mod (standalone repo)`** | Push mod to a separate git remote |
-| **`WS: Reset Workspace`** | Clear targetMod, deps, examples from workspace.json |
-| **`WS: Status`** | Show current workspace configuration |
-
-### Keyboard shortcuts
-
-`Ctrl+Shift+B` is already bound to debug build. To bind other tasks to single keystrokes:
-
-1. Open `Ctrl+Shift+P` → **Preferences: Open Keyboard Shortcuts (JSON)**
-2. Paste the contents of `.vscode/keybindings_suggested.json` inside the `[ ]`
-
-Suggested bindings: `Ctrl+Shift+Alt+B` (release build), `Ctrl+Shift+Alt+P` (publish and reset), `Ctrl+Shift+Alt+S` (status), `Ctrl+Shift+Alt+R` (re-run last task). Adjust keys to suit.
-
----
-
-## How the git workflow works
+Launchers are pre-wired for Claude Code (`.claude/commands/`) and OpenCode
+(`.opencode/command/`), both supporting `$ARGUMENTS`:
 
 ```
-main branch              mod/mymod branch          standalone repo
-───────────────          ─────────────────────     ───────────────
-CLAUDE.md                CLAUDE.md                 source\
-scripts\                 scripts\                  resources\
-workspace.json (clean)   workspace.json (active)   .gitignore
-.gitignore               mods\MyMod\               .git\
-setup.bat                  source\
-.vscode\                   resources\
-.claude\                   Directory.Build.props
-                           ...
+/new-mod GlowingMushroom
+/fix the block disappears when placed on slabs
+/port 1.22.0
 ```
 
-`mods\`, `api\`, `gamesrc\`, `dependencies\`, and `examples\` are **gitignored on `main`**. They exist only as local working directories and are never committed to the main branch.
-
-**`publish-mod`** force-adds `mods\{ModName}\` (bypassing the gitignore), commits it to `mod/{modid}`, pushes, stashes and restores any local changes, then returns you to your original branch.
-
-**`reset`** clears only `targetMod`, `dependencies`, and `examples` from `workspace.json`. Your `gameVersion`, `apiVersion`, `dotnetTarget`, and `gameDirectory` persist — they don't change between projects.
-
----
-
-## Mod project structure
-
-Every mod scaffolded with `new-mod` follows this layout:
-
-```
-mods\MyMod\
-├── .gitignore
-├── Directory.Build.props          ← Edit here: mod name, id, version, description, side, authors
-├── Common.Build.targets           ← Shared MSBuild logic — output paths, refs, modinfo, zip
-├── MyMod_1.21.csproj              ← One file per supported VS version (thin — version + path only)
-├── Properties\
-│   ├── localSettings.props        ← Your machine's game install paths (gitignored)
-│   └── localSettings.props.template  ← Committed template
-├── source\                        ← C# source files
-├── resources\
-│   ├── modicon.png                ← Optional: 32×32 PNG shown in the mod manager
-│   └── assets\mymod\
-│       ├── blocktypes\            ← Block JSON definitions
-│       ├── itemtypes\             ← Item JSON definitions
-│       ├── entities\              ← Entity JSON definitions
-│       ├── recipes\               ← Crafting, alloy, smithing, barrel, etc.
-│       ├── worldgen\              ← World generation config
-│       ├── config\                ← Mod config JSON files
-│       ├── patches\               ← JSON patches to vanilla content
-│       ├── lang\
-│       │   └── en.json            ← Localisation strings
-│       ├── textures\              ← PNG texture files
-│       │   ├── block\             ← Block face textures
-│       │   ├── item\              ← Item textures
-│       │   ├── entity\            ← Entity skin textures
-│       │   └── gui\               ← Dialog backgrounds, HUD icons
-│       ├── shapes\                ← VS JSON cube-model shape files
-│       │   ├── block\
-│       │   ├── item\
-│       │   └── entity\
-│       ├── sounds\                ← OGG sound files
-│       └── music\                 ← OGG music tracks
-├── deps\
-│   └── somedep-1.21\              ← Vendored dep DLLs per VS version (auto-referenced in build)
-└── external\                      ← Ad-hoc DLLs, any version (auto-referenced in build)
-```
-
-**Things to know:**
-- `modinfo.json` is **generated by MSBuild** from `Directory.Build.props` — never create or edit it directly. Change the properties in `Directory.Build.props` instead.
-- `resources\assets\` is **symlinked** into the build output. Asset edits (JSON, textures, sounds) are immediately visible in-game without recompiling.
-- `modicon.png` is **optional**. If present at `resources\modicon.png`, the build copies it to the output root automatically. No config needed.
-- To support a second VS version, copy the `.csproj`, update `<VSVersion>` and `<TargetFramework>`, and add a `GameDirectory` entry in `localSettings.props`.
-
-### Asset reference
-
-| Asset type | Format | Path | Reference in JSON |
-|---|---|---|---|
-| Textures | PNG | `textures/block/`, `textures/item/`, `textures/entity/`, `textures/gui/` | `"texture": { "base": "block/stone/granite" }` |
-| Shapes | JSON (VS format) | `shapes/block/`, `shapes/item/`, `shapes/entity/` | `"shape": { "base": "item/simplewand" }` |
-| Sounds | OGG | `sounds/` | `"sounds": { "place": "block/stone" }` |
-| Vanilla assets | — | — | Prefix with `game:` — e.g. `"game:block/metal/copper"` |
-
-Shape files use VS's own JSON cube-model format, not FBX or OBJ. Author them with [Blockbench](https://www.blockbench.net/) (Vintage Story plugin) or the in-game model editor (`G` key in creative mode). Simple flat items render from their texture alone — no shape file needed.
+They are deliberately thin — each says "read `prompts/X.md` and do that". Edit the
+prompt, and every agent picks the change up.
 
 ---
 
 ## Reference sources
 
-These are fetched once and live in gitignored local folders. Claude Code reads them automatically — they are never used for compilation.
-
-### VS API source (`api\`)
-
-The [vsapi](https://github.com/anegostudios/vsapi) repository contains the full C# API surface. Claude Code reads it to understand available types, interfaces, and method signatures.
+Fetched once into `cache/`, linked into whichever workspaces want them, never used for
+compilation — they exist so your agent can read real code instead of guessing.
 
 ```powershell
-# Fetch and check out at a specific version (recommended)
-.\scripts\vs-workspace.ps1 fetch-api 1.21.5
-
-# Or manually: clone, find the commit, check out, register
-git clone https://github.com/anegostudios/vsapi.git api\1.21.5\vsapi
-git -C api\1.21.5\vsapi log --oneline | Select-String "1.21.5"
-git -C api\1.21.5\vsapi checkout <hash>
-.\scripts\vs-workspace.ps1 use-api 1.21.5
-
-# No git: download ZIP from GitHub, extract to api\1.21.5\vsapi\, then:
-.\scripts\vs-workspace.ps1 use-api 1.21.5
+.\scripts\vsmod.ps1 fetch-api 1.21.5              # vsapi source
+.\scripts\vsmod.ps1 fetch-gamesrc essentials      # core systems
+.\scripts\vsmod.ps1 fetch-gamesrc survival        # blocks, items, world gen
+.\scripts\vsmod.ps1 fetch-gamesrc creative
+.\scripts\vsmod.ps1 add-dep https://github.com/someone/SomeMod.git
+.\scripts\vsmod.ps1 add-example https://github.com/anegostudios/vsmodexamples.git
 ```
 
-If the exact version isn't found, the closest available commit is used automatically.
+Neither vsapi nor the game source repos carry release tags, so the matching commit is
+found by searching history. If an exact version is not found, the closest one is used
+and reported.
 
-### Game source repos (`gamesrc\`)
+### Building against a dependency
 
-The vanilla mod sources show how the game implements its own content — the best reference for writing code that integrates with vanilla systems.
+Reading a dependency's source is not enough to *call* it — the compiler needs its DLL.
+Three tiers are tried in order:
 
-```powershell
-.\scripts\vs-workspace.ps1 fetch-gamesrc essentials   # core: player, weather, trading
-.\scripts\vs-workspace.ps1 fetch-gamesrc survival     # content: blocks, items, world gen
-.\scripts\vs-workspace.ps1 fetch-gamesrc survival 1.21.5   # specific version
-```
+1. `$(GameDirectory)/Mods/*.dll` — automatic if the dep is installed with the game.
+2. `mod/deps/{name}-{vsver}/*.dll` — vendored, committed, travels with the repo.
+3. `mod/external/*.dll` — ad-hoc.
 
-### Dependency mods
-
-Dependencies come in two kinds — source context for Claude Code, and compiled DLLs for the build system. Usually you need both.
-
-**Source context** (`dependencies\`) — Claude Code reads this to understand a dependency's public API when writing code that calls it:
+Populate tier 2 with:
 
 ```powershell
-.\scriptss-workspace.ps1 add-dep https://github.com/someone/SomeMod.git
-.\scriptss-workspace.ps1 add-dep C:\mods\SomeMod
-```
-
-**Build-time DLL reference** — required when your C# code calls into another mod's classes. The compiler needs the DLL to build against. Three tiers are tried in order:
-
-1. DLLs in `$(GameDirectory)/Mods/` — automatic if the dep is installed with the game
-2. DLLs in `mods\MyMod\deps\{name}-{vsver}\` — vendored fallback committed to your mod repo
-3. DLLs in `mods\MyMod\external\` — ad-hoc one-offs
-
-To populate the vendored fallback:
-
-```powershell
-# Auto-discovers from the game's Mods folder
-.\scripts\vs-workspace.ps1 add-dep-dll CarryCapacity 1.21
-
-# Explicit path
-.\scripts\vs-workspace.ps1 add-dep-dll CarryCapacity 1.21 C:\path\to\CarryCapacity.dll
-```
-
-For deps that need a fully customisable install path (overrideable per machine via `localSettings.props`), ask Claude Code to add an explicit named reference — see `CLAUDE.md → Step 3` for the full pattern.
-
-### Example mods (`examples\`)
-
-Add source from mods that demonstrate patterns you want to follow.
-
-```powershell
-.\scripts\vs-workspace.ps1 add-example https://github.com/anegostudios/vsmodexamples.git
+.\scripts\vsmod.ps1 add-dep-dll CarryCapacity 1.21
+.\scripts\vsmod.ps1 add-dep-dll CarryCapacity 1.21 C:\path\to\CarryCapacity.dll
 ```
 
 ---
 
-## workspace.json
+## Command reference
 
-Committed to `main` in its neutral state. The three session-specific fields (`targetMod`, `dependencies`, `examples`) are cleared by `reset` between projects.
+```
+Switching
+  use <Name>                       Make a workspace active — the one command you need
+  list                             List every workspace
+  status                           Active workspace in detail, incl. link health
+  sync                             Rebuild this workspace's links from its manifest
+  remove <Name>                    Delete a workspace (asks for confirmation)
 
-```json
-{
-  "gameVersion":   "1.21.5",
-  "apiVersion":    "1.21.5",
-  "dotnetTarget":  "net8.0",
-  "gameDirectory": "C:\\Program Files\\Vintagestory",
-  "targetMod":     null,
-  "dependencies":  [],
-  "examples":      []
-}
+Starting work
+  new <ModName>                    Scaffold a new mod; mod/ becomes a git repo
+  import <src> [Name]              Import a folder, .zip or git URL
+  git-init                         Turn an imported folder into a git repo
+
+Building and handing off
+  build [debug|release]            Compile the active mod
+  export [path]                    Copy the mod repo out for you to push
+
+Shared cache
+  fetch-api <version>              Cache vsapi source and link it in
+  use-api <version>                Point this workspace at another cached version
+  list-api                         List cached API versions
+  fetch-gamesrc <name> [ver]       essentials | survival | creative
+  list-gamesrc                     List cached game source
+  cache [list|remove <kind>/<name>]  Inspect or prune the cache
+
+Per-workspace context
+  add-dep <path-or-url> [name]     Dependency source, for the agent to read
+  remove-dep <name>                Unlink it (cached copy stays)
+  list-deps                        List this workspace's dependencies
+  add-example <path-or-url> [name] Example mod source
+  remove-example <name>            Unlink it
+  list-examples                    List this workspace's examples
+  add-dep-dll <name> <vsver> [dll] Vendor a dependency DLL into mod/deps/
+
+Setup
+  init                             Create cache/ and workspaces/, check config
+  help                             This list
 ```
 
-| Field | What it controls |
+---
+
+## Mod project structure
+
+Every scaffolded mod:
+
+```
+mod/
+├── .git/                          Already a repo. Commit freely; push by hand.
+├── .gitignore
+├── README.md
+├── Directory.Build.props          Mod identity — edit name, id, version, side, authors
+├── Common.Build.targets           Shared build logic
+├── MyMod_1.21.5.csproj            One per supported game version
+├── Properties/
+│   ├── localSettings.props        Your game paths (gitignored)
+│   └── localSettings.props.template
+├── source/                        C# source
+├── resources/
+│   ├── modicon.png                Optional 32×32, copied to output automatically
+│   └── assets/{modid}/
+│       ├── blocktypes/ itemtypes/ entities/ recipes/ worldgen/ config/ patches/
+│       ├── lang/en.json
+│       ├── textures/{block,item,entity,gui}/
+│       ├── shapes/{block,item,entity}/
+│       └── sounds/ music/
+├── deps/{name}-{vsver}/           Vendored dependency DLLs
+└── external/                      Ad-hoc DLLs, auto-referenced
+```
+
+Three things to know:
+
+- **`modinfo.json` is generated by MSBuild** from `Directory.Build.props`. Never write
+  one by hand — edit the properties instead.
+- **Assets are symlinked** into the build output, so JSON, texture and sound edits are
+  live in-game without rebuilding.
+- **To support another game version**, copy the `.csproj`, update `<VSVersion>` and
+  `<TargetFramework>`, and add a `GameDirectory_X_XX` entry to `localSettings.props`.
+
+### Asset reference
+
+| Type | Format | Referenced as |
+|---|---|---|
+| Textures | PNG | `"texture": { "base": "block/stone/granite" }` |
+| Shapes | VS JSON cube-model | `"shape": { "base": "item/simplewand" }` |
+| Sounds | OGG | `"sounds": { "place": "block/stone" }` |
+| Vanilla anything | — | prefix `game:` — `"game:block/metal/copper"` |
+
+Shapes use Vintage Story's own JSON format, not FBX or OBJ. Author them in
+[Blockbench](https://www.blockbench.net/) with the VS plugin, or the in-game editor
+(`G` in creative). Flat items render from their texture alone and need no shape file.
+
+---
+
+## Automation
+
+There are no editor tasks and no IDE plugin. Everything is `scripts/vsmod.ps1`, so it
+works from a terminal, an agent's shell tool, a file watcher, or a daemon:
+
+```powershell
+pwsh -NoProfile -File scripts/vsmod.ps1 build release
+```
+
+Commands are non-interactive except `remove` and `cache remove`, which ask for typed
+confirmation before deleting anything.
+
+---
+
+## Troubleshooting
+
+| Symptom | Cause |
 |---|---|
-| `gameVersion` | Written into the generated `modinfo.json` as the minimum game version |
-| `apiVersion` | Which `api\` subfolder Claude Code reads for type/interface context |
-| `dotnetTarget` | .NET target for new mod scaffolding (`net7.0` for VS ≤1.21, `net8.0` for ≥1.22) |
-| `gameDirectory` | Pre-filled into `localSettings.props` when scaffolding a new mod |
-| `targetMod` | Active mod for build commands and Claude Code sessions |
-| `dependencies` | Folders under `dependencies\` that Claude Code reads for context |
-| `examples` | Folders under `examples\` that Claude Code studies for patterns |
+| `status` shows `x api/ (not cached)` | Run the `fetch-api` command it prints |
+| A link is missing after moving the harness | Run `sync` — junctions store absolute paths |
+| Build fails on missing game DLLs | `gameDirectory` in `harness.json`, or the mod's `Properties/localSettings.props`, points at the wrong install |
+| `new` refuses a mod name | Names become C# namespaces: letters and digits only, starting with a letter |
+| Initial commit did not happen | Git has no identity yet. Set `user.name` and `user.email`, then run `git-init` |
+| Scripts blocked on Windows | Re-run `setup.bat`, or `Set-ExecutionPolicy RemoteSigned -Scope CurrentUser` |
 
 ---
 
-## Full command reference
+## Licence
 
-```
-init                              Create workspace folder structure
-status                            Show full configuration and validation
-
-fetch-api <version>               Clone vsapi, check out closest version commit
-use-api <version>                 Switch active API version in workspace.json
-list-api                          List downloaded API versions
-
-fetch-gamesrc <name> [version]    Clone game source repo (essentials | survival)
-list-gamesrc                      List fetched game source repos
-
-add-dep <path-or-url> [name]      Add dependency mod source for Claude Code context
-remove-dep <name>                 Remove dependency from scope
-list-deps                         List in-scope dependencies
-
-add-dep-dll <name> <vsver> [path] Copy a dep DLL into the active mod's deps\ folder
-                                    Searches game Mods folder automatically if no path given
-
-add-example <path-or-url> [name]  Add example mod for Claude Code context
-remove-example <name>             Remove example from scope
-list-examples                     List in-scope examples
-
-new-mod <ModName>                 Scaffold a new mod project
-import-mod <src> [name]           Import an existing mod (folder, zip, or git URL)
-use-mod <ModName>                 Set the active target mod
-list-mods                         List all mods in mods\
-
-build [debug|release]             Compile the active mod
-                                    debug:   active apiVersion csproj → bin\Debug\{vsver}\Mods\
-                                    release: all csproj files → Releases\{modid}_{ver}_vs{vsver}.zip
-
-publish-mod [branch] [remote]     Commit mod to a branch and push (default: mod/{modid}, origin)
-export-mod [git-url]              Initialise mod as a standalone git repo; push if URL given
-reset [clean]                     Clear targetMod, dependencies, examples from workspace.json
-                                    clean: also delete local api\, gamesrc\, mods\, deps\, examples\
-```
+See `LICENSE`. Mods you create are yours; add your own licence to each exported repo.
