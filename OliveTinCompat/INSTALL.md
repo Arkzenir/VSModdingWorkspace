@@ -17,6 +17,8 @@ working exactly as it does now.
 | `vsmod-web.ps1` | `<harness>\scripts\` | Adapter — runs `vsmod.ps1` without a terminal |
 | `vsmod-entities.ps1` | `<harness>\scripts\` | Read-only; turns harness state into JSON the UI watches |
 | `vsmod-pick.ps1` | `<harness>\scripts\` | Opens a native Windows file/folder dialog and publishes the choice |
+| `Start-OliveTin.bat` | anywhere (keep the two together) | Double-click to launch |
+| `Start-OliveTin.ps1` | next to the .bat | Preflight checks, starts OliveTin, opens the browser |
 
 ---
 
@@ -74,13 +76,37 @@ Forward slashes on purpose — Windows accepts them and they avoid YAML escaping
 
 ### Run it
 
+Open `Start-OliveTin.ps1` and set the two paths at the top (`$OliveTinDir`,
+`$HarnessRoot`), then double-click **`Start-OliveTin.bat`**.
+
+It preflights everything that would otherwise fail confusingly later — missing
+`pwsh`, blocked scripts, absent harness files, an elevated session — then starts
+OliveTin and opens your browser once the port answers. The console window stays
+open as the log view; closing it stops OliveTin.
+
+If it's already running, the launcher just opens the browser rather than
+starting a second instance and fighting over the port.
+
+For a desktop icon:
+
+```
+Start-OliveTin.bat -Shortcut
+```
+
+The equivalent by hand is still just:
+
 ```powershell
 cd C:\OliveTin
 .\OliveTin.exe
 ```
 
-Open <http://127.0.0.1:1337>. You should see five dashboards across the top:
-**Workbench**, **Add**, **Workspaces**, **Linked**, **Cache**.
+Either way, open <http://127.0.0.1:1337>. You should see five dashboards across
+the top: **Workbench**, **Add**, **Workspaces**, **Linked**, **Cache**.
+
+**Don't use "Run as administrator."** The harness uses junctions specifically so
+it works unelevated, and User Interface Privilege Isolation can stop an elevated
+process from showing dialogs on your normal desktop — which would break the
+Browse buttons. The launcher warns you if you do it anyway.
 
 **Run it in a terminal under your own account, not as a Windows service.** Two
 independent reasons now:
