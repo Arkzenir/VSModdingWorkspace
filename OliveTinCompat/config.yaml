@@ -1,0 +1,802 @@
+# =============================================================================
+#  OliveTin config for the Vintage Story Modding Harness (vsmod.ps1)
+# =============================================================================
+#
+#  BEFORE FIRST RUN, find-and-replace these four strings throughout this file:
+#
+#    C:/dev/VSModdingWorkspace                    -> your harness root
+#    C:/OliveTin                                  -> your OliveTin folder
+#    C:/Program Files/PowerShell/7/pwsh.exe       -> your pwsh path
+#    C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe   -> rarely changes
+#
+#  Two PowerShells on purpose. pwsh (7) runs the harness. powershell.exe (5.1)
+#  runs the file dialogs only, because WinForms needs a single-threaded
+#  apartment and pwsh has no -STA switch.
+#
+#  Every action uses `exec:` rather than `shell:`. On Windows `shell:` wraps the
+#  command in `cmd /C`, not PowerShell, and OliveTin refuses to combine `shell:`
+#  with the argument types needed here. `exec:` passes argv straight to the OS.
+# =============================================================================
+
+listenAddressSingleHTTPFrontend: 127.0.0.1:1337
+logLevel: "INFO"
+
+# -----------------------------------------------------------------------------
+#  Entities
+# -----------------------------------------------------------------------------
+#  workspaces / active / apis / gamesrc / deps / examples / cacheitems
+#      written by vsmod-entities.ps1
+#  picked
+#      written by vsmod-pick.ps1 - holds the current file-dialog selection
+# -----------------------------------------------------------------------------
+entities:
+  - file: C:/OliveTin/entities/active.json
+    name: active
+
+  - file: C:/OliveTin/entities/workspaces.json
+    name: workspace
+
+  - file: C:/OliveTin/entities/apis.json
+    name: api
+
+  - file: C:/OliveTin/entities/gamesrc.json
+    name: gamesrc
+
+  - file: C:/OliveTin/entities/deps.json
+    name: dep
+
+  - file: C:/OliveTin/entities/examples.json
+    name: example
+
+  - file: C:/OliveTin/entities/cacheitems.json
+    name: cacheitem
+
+  - file: C:/OliveTin/entities/picked.json
+    name: picked
+
+# -----------------------------------------------------------------------------
+#  Actions
+# -----------------------------------------------------------------------------
+actions:
+
+  # ── State refresh ──────────────────────────────────────────────────────────
+  - title: Refresh harness state
+    id: refresh_state
+    hidden: true
+    execOnStartup: true
+    execOnCron: "*/2 * * * *"
+    timeout: 120
+    exec:
+      - "C:/Program Files/PowerShell/7/pwsh.exe"
+      - "-NoProfile"
+      - "-File"
+      - "C:/dev/VSModdingWorkspace/scripts/vsmod-entities.ps1"
+      - "-HarnessRoot"
+      - "C:/dev/VSModdingWorkspace"
+      - "-OutDir"
+      - "C:/OliveTin/entities"
+
+  # ── Status ─────────────────────────────────────────────────────────────────
+  # The `id` is what the stdout-most-recent-execution view on the Workbench
+  # dashboard points at. Runs on a cron and after every state change so the
+  # stored output is never stale.
+  - title: Show status
+    id: vsmod_status
+    icon: "📋"
+    timeout: 120
+    execOnStartup: true
+    execOnCron: "*/2 * * * *"
+    exec:
+      - "C:/Program Files/PowerShell/7/pwsh.exe"
+      - "-NoProfile"
+      - "-File"
+      - "C:/dev/VSModdingWorkspace/scripts/vsmod-web.ps1"
+      - "-"
+      - "status"
+
+  # ── Building ───────────────────────────────────────────────────────────────
+  - title: Build debug
+    id: build_debug
+    icon: "🔨"
+    timeout: 1800
+    exec:
+      - "C:/Program Files/PowerShell/7/pwsh.exe"
+      - "-NoProfile"
+      - "-File"
+      - "C:/dev/VSModdingWorkspace/scripts/vsmod-web.ps1"
+      - "-"
+      - "build"
+      - "debug"
+
+  - title: Build release
+    id: build_release
+    icon: "📦"
+    timeout: 1800
+    triggers:
+      - Refresh harness state
+    exec:
+      - "C:/Program Files/PowerShell/7/pwsh.exe"
+      - "-NoProfile"
+      - "-File"
+      - "C:/dev/VSModdingWorkspace/scripts/vsmod-web.ps1"
+      - "-"
+      - "build"
+      - "release"
+
+  # ── Workspace housekeeping ─────────────────────────────────────────────────
+  - title: Sync cache links
+    icon: "🔗"
+    timeout: 300
+    triggers:
+      - Refresh harness state
+      - Show status
+    exec:
+      - "C:/Program Files/PowerShell/7/pwsh.exe"
+      - "-NoProfile"
+      - "-File"
+      - "C:/dev/VSModdingWorkspace/scripts/vsmod-web.ps1"
+      - "-"
+      - "sync"
+
+  - title: Git init the mod folder
+    icon: "🌱"
+    timeout: 120
+    triggers:
+      - Refresh harness state
+    exec:
+      - "C:/Program Files/PowerShell/7/pwsh.exe"
+      - "-NoProfile"
+      - "-File"
+      - "C:/dev/VSModdingWorkspace/scripts/vsmod-web.ps1"
+      - "-"
+      - "git-init"
+
+  - title: Export mod
+    icon: "📤"
+    description: Exports to exportDirectory from harness.json.
+    timeout: 600
+    exec:
+      - "C:/Program Files/PowerShell/7/pwsh.exe"
+      - "-NoProfile"
+      - "-File"
+      - "C:/dev/VSModdingWorkspace/scripts/vsmod-web.ps1"
+      - "-"
+      - "export"
+
+  - title: Initialise harness folders
+    icon: "🧱"
+    timeout: 120
+    triggers:
+      - Refresh harness state
+    exec:
+      - "C:/Program Files/PowerShell/7/pwsh.exe"
+      - "-NoProfile"
+      - "-File"
+      - "C:/dev/VSModdingWorkspace/scripts/vsmod-web.ps1"
+      - "-"
+      - "init"
+
+  - title: New mod
+    icon: "✨"
+    timeout: 300
+    triggers:
+      - Refresh harness state
+      - Show status
+    exec:
+      - "C:/Program Files/PowerShell/7/pwsh.exe"
+      - "-NoProfile"
+      - "-File"
+      - "C:/dev/VSModdingWorkspace/scripts/vsmod-web.ps1"
+      - "-"
+      - "new"
+      - "{{ modName }}"
+    arguments:
+      - name: modName
+        title: Mod name
+        description: PascalCase, no spaces. Becomes the workspace and project name.
+        type: ascii_identifier
+
+  # ===========================================================================
+  #  FILE DIALOGS
+  # ===========================================================================
+  #  A browser cannot give a server a local path - <input type=file> hands over
+  #  file *contents*, and the path is deliberately withheld. So the dialog is
+  #  opened server-side instead, which works because OliveTin is running on your
+  #  own machine in your own session.
+  #
+  #  Flow: pick once, then choose what to do with the selection. The selection
+  #  becomes a one-row entity, so the "apply" buttons appear on the dashboard
+  #  within a second of the dialog closing.
+  #
+  #  Requires OliveTin to be running in your interactive session, NOT as a
+  #  Windows service. vsmod-pick.ps1 fails fast with an explanation if not.
+  # ===========================================================================
+
+  - title: Browse for a folder
+    icon: "📁"
+    timeout: 300
+    exec:
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe"
+      - "-NoProfile"
+      - "-STA"
+      - "-File"
+      - "C:/dev/VSModdingWorkspace/scripts/vsmod-pick.ps1"
+      - "-Mode"
+      - "folder"
+      - "-OutDir"
+      - "C:/OliveTin/entities"
+
+  - title: Browse for a .zip
+    icon: "🗜️"
+    timeout: 300
+    exec:
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe"
+      - "-NoProfile"
+      - "-STA"
+      - "-File"
+      - "C:/dev/VSModdingWorkspace/scripts/vsmod-pick.ps1"
+      - "-Mode"
+      - "zip"
+      - "-OutDir"
+      - "C:/OliveTin/entities"
+
+  - title: Browse for a .dll
+    icon: "🧰"
+    timeout: 300
+    # Opens in the game's Mods folder, which is where dependency DLLs live.
+    exec:
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe"
+      - "-NoProfile"
+      - "-STA"
+      - "-File"
+      - "C:/dev/VSModdingWorkspace/scripts/vsmod-pick.ps1"
+      - "-Mode"
+      - "dll"
+      - "-OutDir"
+      - "C:/OliveTin/entities"
+      - "-StartIn"
+      - "C:/Users/Public/Documents/VintagestoryData/Mods"
+
+  # ── Acting on the selection ────────────────────────────────────────────────
+  - title: "Import selection as workspace"
+    icon: "📥"
+    entity: picked
+    timeout: 900
+    enabledExpression: '{{ ne .CurrentEntity.kind "dll" }}'
+    triggers:
+      - Refresh harness state
+      - Show status
+    exec:
+      - "C:/Program Files/PowerShell/7/pwsh.exe"
+      - "-NoProfile"
+      - "-File"
+      - "C:/dev/VSModdingWorkspace/scripts/vsmod-web.ps1"
+      - "-"
+      - "import"
+      - "{{ .CurrentEntity.path }}"
+      - "{{ workspaceName }}"
+    arguments:
+      - name: workspaceName
+        title: Workspace name (optional)
+        description: Blank uses the folder or zip name.
+        type: 'regex:^[A-Za-z0-9._-]*$'
+        default: ""
+
+  - title: "Add selection as dependency"
+    icon: "🧩"
+    entity: picked
+    timeout: 600
+    enabledExpression: '{{ ne .CurrentEntity.kind "dll" }}'
+    triggers:
+      - Refresh harness state
+    exec:
+      - "C:/Program Files/PowerShell/7/pwsh.exe"
+      - "-NoProfile"
+      - "-File"
+      - "C:/dev/VSModdingWorkspace/scripts/vsmod-web.ps1"
+      - "-"
+      - "add-dep"
+      - "{{ .CurrentEntity.path }}"
+      - "{{ depName }}"
+    arguments:
+      - name: depName
+        title: Name (optional)
+        type: 'regex:^[A-Za-z0-9._-]*$'
+        default: ""
+
+  - title: "Add selection as example"
+    icon: "📚"
+    entity: picked
+    timeout: 600
+    enabledExpression: '{{ ne .CurrentEntity.kind "dll" }}'
+    triggers:
+      - Refresh harness state
+    exec:
+      - "C:/Program Files/PowerShell/7/pwsh.exe"
+      - "-NoProfile"
+      - "-File"
+      - "C:/dev/VSModdingWorkspace/scripts/vsmod-web.ps1"
+      - "-"
+      - "add-example"
+      - "{{ .CurrentEntity.path }}"
+      - "{{ exampleName }}"
+    arguments:
+      - name: exampleName
+        title: Name (optional)
+        type: 'regex:^[A-Za-z0-9._-]*$'
+        default: ""
+
+  - title: "Vendor selection into deps"
+    icon: "🧱"
+    entity: picked
+    timeout: 300
+    enabledExpression: '{{ eq .CurrentEntity.kind "dll" }}'
+    exec:
+      - "C:/Program Files/PowerShell/7/pwsh.exe"
+      - "-NoProfile"
+      - "-File"
+      - "C:/dev/VSModdingWorkspace/scripts/vsmod-web.ps1"
+      - "-"
+      - "add-dep-dll"
+      - "{{ dllModId }}"
+      - "{{ dllVsVersion }}"
+      - "{{ .CurrentEntity.path }}"
+    arguments:
+      - name: dllModId
+        title: Mod ID
+        description: The dependency's mod id.
+        type: ascii_identifier
+      - name: dllVsVersion
+        title: Game version
+        description: "e.g. 1.21.5"
+        type: ascii_identifier
+
+  - title: "Export mod to selection"
+    icon: "📨"
+    entity: picked
+    timeout: 600
+    enabledExpression: '{{ eq .CurrentEntity.kind "folder" }}'
+    exec:
+      - "C:/Program Files/PowerShell/7/pwsh.exe"
+      - "-NoProfile"
+      - "-File"
+      - "C:/dev/VSModdingWorkspace/scripts/vsmod-web.ps1"
+      - "-"
+      - "export"
+      - "{{ .CurrentEntity.path }}"
+
+  - title: Clear selection
+    icon: "✖️"
+    timeout: 60
+    exec:
+      - "C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe"
+      - "-NoProfile"
+      - "-File"
+      - "C:/dev/VSModdingWorkspace/scripts/vsmod-pick.ps1"
+      - "-Mode"
+      - "clear"
+      - "-OutDir"
+      - "C:/OliveTin/entities"
+
+  # ── Git URLs (no dialog needed) ────────────────────────────────────────────
+  - title: Import from git URL
+    icon: "🌐"
+    timeout: 900
+    triggers:
+      - Refresh harness state
+      - Show status
+    exec:
+      - "C:/Program Files/PowerShell/7/pwsh.exe"
+      - "-NoProfile"
+      - "-File"
+      - "C:/dev/VSModdingWorkspace/scripts/vsmod-web.ps1"
+      - "-"
+      - "import"
+      - "{{ repoUrl }}"
+      - "{{ workspaceName }}"
+    arguments:
+      - name: repoUrl
+        title: Git URL
+        type: url
+      - name: workspaceName
+        title: Workspace name (optional)
+        type: 'regex:^[A-Za-z0-9._-]*$'
+        default: ""
+
+  - title: Add dependency from git URL
+    icon: "🌐"
+    timeout: 900
+    triggers:
+      - Refresh harness state
+    exec:
+      - "C:/Program Files/PowerShell/7/pwsh.exe"
+      - "-NoProfile"
+      - "-File"
+      - "C:/dev/VSModdingWorkspace/scripts/vsmod-web.ps1"
+      - "-"
+      - "add-dep"
+      - "{{ repoUrl }}"
+      - "{{ depName }}"
+    arguments:
+      - name: repoUrl
+        title: Git URL
+        type: url
+      - name: depName
+        title: Name (optional)
+        type: 'regex:^[A-Za-z0-9._-]*$'
+        default: ""
+
+  - title: Add example from git URL
+    icon: "🌐"
+    timeout: 900
+    triggers:
+      - Refresh harness state
+    exec:
+      - "C:/Program Files/PowerShell/7/pwsh.exe"
+      - "-NoProfile"
+      - "-File"
+      - "C:/dev/VSModdingWorkspace/scripts/vsmod-web.ps1"
+      - "-"
+      - "add-example"
+      - "{{ repoUrl }}"
+      - "{{ exampleName }}"
+    arguments:
+      - name: repoUrl
+        title: Git URL
+        type: url
+      - name: exampleName
+        title: Name (optional)
+        type: 'regex:^[A-Za-z0-9._-]*$'
+        default: ""
+
+  # ── Reference sources ──────────────────────────────────────────────────────
+  - title: Fetch API version
+    icon: "⬇️"
+    timeout: 1800
+    triggers:
+      - Refresh harness state
+    exec:
+      - "C:/Program Files/PowerShell/7/pwsh.exe"
+      - "-NoProfile"
+      - "-File"
+      - "C:/dev/VSModdingWorkspace/scripts/vsmod-web.ps1"
+      - "-"
+      - "fetch-api"
+      - "{{ apiVersion }}"
+    arguments:
+      - name: apiVersion
+        title: API version
+        description: "e.g. 1.21.5"
+        type: ascii_identifier
+
+  - title: Fetch game source
+    icon: "🗂️"
+    timeout: 1800
+    triggers:
+      - Refresh harness state
+    exec:
+      - "C:/Program Files/PowerShell/7/pwsh.exe"
+      - "-NoProfile"
+      - "-File"
+      - "C:/dev/VSModdingWorkspace/scripts/vsmod-web.ps1"
+      - "-"
+      - "fetch-gamesrc"
+      - "{{ repo }}"
+      - "{{ gameSrcVersion }}"
+    arguments:
+      - name: repo
+        title: Repository
+        choices:
+          - title: Survival
+            value: survival
+          - title: Essentials
+            value: essentials
+          - title: Creative
+            value: creative
+      - name: gameSrcVersion
+        title: Version (optional)
+        description: Blank fetches the default branch.
+        type: 'regex:^[A-Za-z0-9._-]*$'
+        default: ""
+
+  # ── Entity actions: workspaces ─────────────────────────────────────────────
+  - title: "Activate {{ .CurrentEntity.name }}"
+    icon: "✅"
+    entity: workspace
+    timeout: 300
+    enabledExpression: '{{ eq .CurrentEntity.active "no" }}'
+    triggers:
+      - Refresh harness state
+      - Show status
+    exec:
+      - "C:/Program Files/PowerShell/7/pwsh.exe"
+      - "-NoProfile"
+      - "-File"
+      - "C:/dev/VSModdingWorkspace/scripts/vsmod-web.ps1"
+      - "-"
+      - "use"
+      - "{{ .CurrentEntity.name }}"
+
+  - title: "Delete {{ .CurrentEntity.name }}"
+    icon: "🗑️"
+    entity: workspace
+    timeout: 300
+    triggers:
+      - Refresh harness state
+      - Show status
+    # vsmod.ps1 asks you to type the workspace name. The first argument to
+    # vsmod-web.ps1 answers that; the browser confirmation below is the real gate.
+    exec:
+      - "C:/Program Files/PowerShell/7/pwsh.exe"
+      - "-NoProfile"
+      - "-File"
+      - "C:/dev/VSModdingWorkspace/scripts/vsmod-web.ps1"
+      - "{{ .CurrentEntity.name }}"
+      - "remove"
+      - "{{ .CurrentEntity.name }}"
+    arguments:
+      - type: html
+        title: Warning
+        default: >
+          Deletes the whole workspace including <code>mod\</code> and any
+          uncommitted work in it. The shared cache is not touched.
+      - type: confirmation
+        title: Yes, delete this workspace
+
+  # ── Entity actions: cached API versions ────────────────────────────────────
+  - title: "Use API {{ .CurrentEntity.version }}"
+    icon: "🎯"
+    entity: api
+    timeout: 300
+    enabledExpression: '{{ eq .CurrentEntity.active "no" }}'
+    triggers:
+      - Refresh harness state
+      - Show status
+    exec:
+      - "C:/Program Files/PowerShell/7/pwsh.exe"
+      - "-NoProfile"
+      - "-File"
+      - "C:/dev/VSModdingWorkspace/scripts/vsmod-web.ps1"
+      - "-"
+      - "use-api"
+      - "{{ .CurrentEntity.version }}"
+
+  # ── Entity actions: linked context ─────────────────────────────────────────
+  - title: "Unlink dependency {{ .CurrentEntity.name }}"
+    icon: "➖"
+    entity: dep
+    timeout: 120
+    triggers:
+      - Refresh harness state
+    exec:
+      - "C:/Program Files/PowerShell/7/pwsh.exe"
+      - "-NoProfile"
+      - "-File"
+      - "C:/dev/VSModdingWorkspace/scripts/vsmod-web.ps1"
+      - "-"
+      - "remove-dep"
+      - "{{ .CurrentEntity.name }}"
+
+  - title: "Unlink example {{ .CurrentEntity.name }}"
+    icon: "➖"
+    entity: example
+    timeout: 120
+    triggers:
+      - Refresh harness state
+    exec:
+      - "C:/Program Files/PowerShell/7/pwsh.exe"
+      - "-NoProfile"
+      - "-File"
+      - "C:/dev/VSModdingWorkspace/scripts/vsmod-web.ps1"
+      - "-"
+      - "remove-example"
+      - "{{ .CurrentEntity.name }}"
+
+  # ── Entity actions: cache pruning ──────────────────────────────────────────
+  - title: "Purge {{ .CurrentEntity.ref }}"
+    icon: "🧹"
+    entity: cacheitem
+    timeout: 300
+    triggers:
+      - Refresh harness state
+    exec:
+      - "C:/Program Files/PowerShell/7/pwsh.exe"
+      - "-NoProfile"
+      - "-File"
+      - "C:/dev/VSModdingWorkspace/scripts/vsmod-web.ps1"
+      - "YES"
+      - "cache"
+      - "remove"
+      - "{{ .CurrentEntity.ref }}"
+    arguments:
+      - type: html
+        title: Warning
+        default: >
+          Workspaces linking this will show a broken link until re-fetched.
+          Run <strong>Sync cache links</strong> in each affected workspace after.
+      - type: confirmation
+        title: Yes, purge this cache entry
+
+# -----------------------------------------------------------------------------
+#  Concurrency
+# -----------------------------------------------------------------------------
+#  Recommended. The group syntax below is right, but the property that attaches
+#  an *action* to a group varies between releases - check
+#  https://docs.olivetin.app/action_customization/concurrency.html#action-groups
+#  and add it to every mutating action above.
+#
+#  This matters: vsmod.ps1 rewrites harness.json and workspace.json, so two
+#  overlapping runs can lose writes.
+#
+# actionGroups:
+#   vsmod:
+#     maxConcurrent: 1
+#     queueSize: 10
+
+# -----------------------------------------------------------------------------
+#  Dashboards
+# -----------------------------------------------------------------------------
+#  Actions are defined above and only *linked* here by title. An action can
+#  appear on one dashboard only, and every title must be unique.
+#
+#  `type: stdout-most-recent-execution` shows an action's last output inline.
+#  Its `title:` is the action's `id:`, not its display title. The panel
+#  refreshes on page load rather than live, which is why the status action also
+#  runs on a cron and as a trigger of everything that changes state.
+# -----------------------------------------------------------------------------
+dashboards:
+
+  - title: Workbench
+    contents:
+
+      # Live: entity files are watched, so this panel updates without a reload.
+      - title: "{{ .CurrentEntity.name }} v{{ .CurrentEntity.modVersion }}"
+        type: fieldset
+        entity: active
+        contents:
+          - type: display
+            title: |
+              <strong>{{ .CurrentEntity.modId }}</strong>
+              &nbsp;&middot;&nbsp; VS API {{ .CurrentEntity.apiVersion }}
+              &nbsp;&middot;&nbsp; game {{ .CurrentEntity.gameVersion }}
+              &nbsp;&middot;&nbsp; {{ .CurrentEntity.dotnetTarget }}<br />
+              <br />
+              deps: {{ .CurrentEntity.depList }}<br />
+              examples: {{ .CurrentEntity.exampleList }}<br />
+              <br />
+              last release: <strong>{{ .CurrentEntity.lastRelease }}</strong>
+              {{ .CurrentEntity.lastReleaseAt }}
+
+      - title: Build
+        type: fieldset
+        contents:
+          - title: Build debug
+          - title: Build release
+          - title: Sync cache links
+          - title: Export mod
+          - title: Git init the mod folder
+
+      # Full `vsmod status` output, inline. No trip to the Logs tab.
+      - title: Status
+        type: fieldset
+        contents:
+          - title: Show status
+          - type: stdout-most-recent-execution
+            title: vsmod_status
+
+      - title: Last debug build
+        type: fieldset
+        contents:
+          - type: stdout-most-recent-execution
+            title: build_debug
+
+      - title: Last release build
+        type: fieldset
+        contents:
+          - type: stdout-most-recent-execution
+            title: build_release
+
+  - title: Add
+    contents:
+
+      - title: Browse this machine
+        type: fieldset
+        contents:
+          - title: Browse for a folder
+          - title: Browse for a .zip
+          - title: Browse for a .dll
+
+      # Appears within a second of the dialog closing; empty until you pick
+      # something. Which buttons are enabled depends on what kind of thing it is.
+      - title: "Selected: {{ .CurrentEntity.shown }}"
+        type: fieldset
+        entity: picked
+        contents:
+          - type: display
+            title: |
+              <strong>{{ .CurrentEntity.name }}</strong> ({{ .CurrentEntity.kind }})<br />
+              <code>{{ .CurrentEntity.path }}</code>
+          - title: "Import selection as workspace"
+          - title: "Add selection as dependency"
+          - title: "Add selection as example"
+          - title: "Vendor selection into deps"
+          - title: "Export mod to selection"
+
+      - title: Selection
+        type: fieldset
+        contents:
+          - title: Clear selection
+
+      - title: From a git URL
+        type: fieldset
+        contents:
+          - title: Import from git URL
+          - title: Add dependency from git URL
+          - title: Add example from git URL
+
+      - title: Start fresh
+        type: fieldset
+        contents:
+          - title: New mod
+          - title: Initialise harness folders
+
+      - title: Reference sources
+        type: fieldset
+        contents:
+          - title: Fetch API version
+          - title: Fetch game source
+
+  - title: Workspaces
+    contents:
+      - title: "{{ .CurrentEntity.name }} v{{ .CurrentEntity.modVersion }}"
+        type: fieldset
+        entity: workspace
+        contents:
+          - type: display
+            cssClass: "ws-{{ .CurrentEntity.active }}"
+            title: |
+              <strong>{{ .CurrentEntity.modId }}</strong><br />
+              VS API {{ .CurrentEntity.apiVersion }} &middot; {{ .CurrentEntity.dotnetTarget }}<br />
+              {{ .CurrentEntity.depCount }} deps &middot; {{ .CurrentEntity.exampleCount }} examples
+              &middot; git: {{ .CurrentEntity.hasGit }}
+          - title: "Activate {{ .CurrentEntity.name }}"
+          - title: "Delete {{ .CurrentEntity.name }}"
+
+  - title: Linked
+    contents:
+      - title: "API {{ .CurrentEntity.version }}"
+        type: fieldset
+        entity: api
+        contents:
+          - title: "Use API {{ .CurrentEntity.version }}"
+
+      - title: "Game source: {{ .CurrentEntity.name }}"
+        type: fieldset
+        entity: gamesrc
+        contents:
+          - type: display
+            title: "cached, linked into the active workspace"
+
+      - title: "Dependency: {{ .CurrentEntity.name }}"
+        type: fieldset
+        entity: dep
+        contents:
+          - type: display
+            title: "cached: {{ .CurrentEntity.cached }}"
+          - title: "Unlink dependency {{ .CurrentEntity.name }}"
+
+      - title: "Example: {{ .CurrentEntity.name }}"
+        type: fieldset
+        entity: example
+        contents:
+          - type: display
+            title: "cached: {{ .CurrentEntity.cached }}"
+          - title: "Unlink example {{ .CurrentEntity.name }}"
+
+  - title: Cache
+    contents:
+      - title: "{{ .CurrentEntity.ref }}"
+        type: fieldset
+        entity: cacheitem
+        contents:
+          - title: "Purge {{ .CurrentEntity.ref }}"
