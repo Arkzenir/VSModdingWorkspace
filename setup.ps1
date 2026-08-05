@@ -29,6 +29,24 @@ if ($onWindows) {
     } catch {
         Write-Host "[--] Could not unblock automatically. Right-click each .ps1 -> Properties -> Unblock." -ForegroundColor Yellow
     }
+
+    # setup.bat launches this file with -ExecutionPolicy Bypass, which only covers
+    # this one process. Without setting the policy for the user, running
+    # scripts\vsmod.ps1 directly afterwards still fails with
+    # "running scripts is disabled on this system".
+    try {
+        $current = Get-ExecutionPolicy -Scope CurrentUser
+        if ($current -in @("Restricted", "Undefined", "AllSigned")) {
+            Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
+            Write-Host "[ok] Execution policy set to RemoteSigned for your user account." -ForegroundColor Green
+        } else {
+            Write-Host "[ok] Execution policy already permits local scripts ($current)." -ForegroundColor Green
+        }
+    } catch {
+        Write-Host "[!!] Could not set the execution policy." -ForegroundColor Yellow
+        Write-Host "     Run this in PowerShell, then re-run setup:" -ForegroundColor Yellow
+        Write-Host "       Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser" -ForegroundColor Cyan
+    }
 }
 
 # ── Prerequisite checks ───────────────────────────────────────────────────────

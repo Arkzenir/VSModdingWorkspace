@@ -1,6 +1,10 @@
-Give me a quick status overview of the current workspace session:
+---
+description: Show the current workspace and session state
+---
 
-1. Run: `.\scripts\vs-workspace.ps1 status`
-2. Report the active mod, API version, and which dependencies and game source repos are loaded.
-3. Summarise what has been built or changed so far in this session (based on the conversation history).
-4. List what still needs to be done if a task is in progress.
+Read `prompts/status.md` and carry out that task exactly as written.
+
+Arguments: $ARGUMENTS
+
+The canonical instructions live in `prompts/status.md` and the project conventions in
+`AGENTS.md`. This file is only a launcher — if the two ever disagree, the prompt file wins.

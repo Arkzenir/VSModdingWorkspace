@@ -1,16 +1,10 @@
-Port the current mod to Vintage Story version **$ARGUMENTS**.
+---
+description: Port the active mod to another game version
+---
 
-1. Read `workspace.json` to confirm the current mod and API version.
-2. Read all source files and the current `.csproj` to understand the starting state.
-3. Check the API source at `api\$ARGUMENTS\vsapi\` (fetch it first if not present: `.\scripts\vs-workspace.ps1 fetch-api $ARGUMENTS`).
-4. Identify breaking changes between the current version and $ARGUMENTS:
-   - Changed method signatures (compare vsapi source)
-   - Renamed or moved types
-   - Updated JSON asset format requirements
-   - .NET target framework: net7.0 for VS ≤1.20, net8.0 for VS ≥1.21
-5. Create a new `{ModName}_$ARGUMENTS.csproj` modelled on the existing one with the updated `<VSVersion>` and `<TargetFramework>`.
-6. Fix any compilation errors caused by API changes.
-7. Update `localSettings.props.template` with a `GameDirectory` entry for the new version.
-8. Run the build to confirm: `.\scripts\vs-workspace.ps1 build`
+Read `prompts/port.md` and carry out that task exactly as written.
 
-Summarise every breaking change found and how it was resolved.
+Arguments: $ARGUMENTS
+
+The canonical instructions live in `prompts/port.md` and the project conventions in
+`AGENTS.md`. This file is only a launcher — if the two ever disagree, the prompt file wins.

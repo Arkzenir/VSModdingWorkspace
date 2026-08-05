@@ -1,11 +1,10 @@
-Diagnose and fix the following issue in the current mod: **$ARGUMENTS**
+---
+description: Diagnose and fix a bug in the active mod
+---
 
-Follow Task Mode B in CLAUDE.md:
-1. Read `workspace.json` to confirm the active mod and API version.
-2. Read **all** existing source files before touching anything.
-3. If a crash log or error message is included above, identify the exception type and stack trace first.
-4. Cross-reference the API source at `api\{apiVersion}\vsapi\` to check for renamed methods, moved interfaces, or changed signatures.
-5. Apply the minimal fix needed with a comment explaining the cause.
-6. Scan the rest of the codebase for the same class of mistake.
+Read `prompts/fix.md` and carry out that task exactly as written.
 
-Summarise: what the bug was, what caused it, what was changed, and how to verify the fix in-game.
+Arguments: $ARGUMENTS
+
+The canonical instructions live in `prompts/fix.md` and the project conventions in
+`AGENTS.md`. This file is only a launcher — if the two ever disagree, the prompt file wins.

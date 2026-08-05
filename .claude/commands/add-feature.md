@@ -1,9 +1,10 @@
-Add the following feature to the current mod: **$ARGUMENTS**
+---
+description: Add a feature to the active mod
+---
 
-Before writing any code:
-1. Read `workspace.json` to confirm the active mod and API version.
-2. Read all existing source files in `mods\{targetMod}\source\` to understand what is already implemented.
-3. Check the API source at `api\{apiVersion}\vsapi\` and the API docs at https://apidocs.vintagestory.at/ for relevant hooks and types.
-4. Check `gamesrc\` if present for vanilla patterns that match this feature.
+Read `prompts/add-feature.md` and carry out that task exactly as written.
 
-Then implement the feature following Task Mode A in CLAUDE.md. When done, tell me what was built and run the debug build to confirm it compiles.
+Arguments: $ARGUMENTS
+
+The canonical instructions live in `prompts/add-feature.md` and the project conventions in
+`AGENTS.md`. This file is only a launcher — if the two ever disagree, the prompt file wins.

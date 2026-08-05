@@ -1,26 +1,69 @@
 # ================================================================
-# VS Modding Workspace — root .gitignore
+# VS Modding Harness -- root .gitignore
 #
-# Tool files (CLAUDE.md, scripts/, README.md, workspace.json,
-# setup.bat, .vscode/, .claude/) are committed to main.
+# This repo tracks the HARNESS ONLY: AGENTS.md and its pointer files,
+# scripts/, prompts/, the agent command adapters, harness.example.json,
+# setup scripts, README and LICENSE.
 #
-# Everything below is local working data managed by the script.
-# Re-populate after a fresh clone with:
-#   .\scripts\vs-workspace.ps1 init
-#   .\scripts\vs-workspace.ps1 fetch-api <version>
-#   .\scripts\vs-workspace.ps1 fetch-gamesrc essentials
-#   .\scripts\vs-workspace.ps1 fetch-gamesrc survival
+# Nothing about your mods, your machine, or anything downloaded belongs
+# here. Each mod is versioned in its own repo at workspaces/<Name>/mod/,
+# so pulling harness updates can never touch your work.
+#
+# A fresh clone recreates the ignored folders with:
+#   .\scripts\vsmod.ps1 init
 # ================================================================
 
-# Fetched API source (re-fetch with: fetch-api <version>)
-/api/
+# ── Your machine's config ─────────────────────────────────────────
+# Contains your game install path and which workspace is active.
+# Copy harness.example.json -> harness.json (or let 'init' do it).
+/harness.json
 
-# Fetched game source repos (re-fetch with: fetch-gamesrc <name>)
-/gamesrc/
+# ── Your mods ─────────────────────────────────────────────────────
+# Every workspaces/<Name>/mod/ is a self-contained git repo, tracked
+# there and nowhere else. Also holds the junctions into cache/, build
+# output, and per-machine localSettings.props -- none of it shareable.
+/workspaces/
 
-# Mod context source (re-add with: add-dep / add-example)
-/dependencies/
-/examples/
+# ── Downloaded reference sources ──────────────────────────────────
+# vsapi, vanilla game source, dependency and example mods. Large,
+# machine-local, and re-fetchable:
+#   .\scripts\vsmod.ps1 fetch-api <version>
+#   .\scripts\vsmod.ps1 fetch-gamesrc essentials
+#   .\scripts\vsmod.ps1 fetch-gamesrc survival
+/cache/
 
-# Active mod work (save to branch with: publish-mod / export-mod)
-/mods/
+# ── Mods copied out for publishing ────────────────────────────────
+# Default destination for 'vsmod.ps1 export'.
+/exports/
+
+# ── Agent-local state ─────────────────────────────────────────────
+# Session history, credentials and per-user overrides written by
+# whichever agent you use. The shared instructions and command
+# adapters ARE tracked; this is only the local scratch state.
+.claude/settings.local.json
+.claude/local/
+.claude/history/
+.opencode/auth.json
+.opencode/state/
+.opencode/cache/
+.goose/
+.aider*
+.cursor/
+.codex/
+.gemini/
+*.session.json
+
+# ── Editor and OS noise ───────────────────────────────────────────
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# ── Logs and scratch ──────────────────────────────────────────────
+*.log
+/tmp/
+/scratch/

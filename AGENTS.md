@@ -23,6 +23,34 @@ instructions.
    change there silently affects unrelated mods.
 5. **Do not create `modinfo.json`.** The build generates it from
    `Directory.Build.props`. Edit those properties instead.
+6. **Never run `git clean -xfd`, `git clean -x`, or any recursive delete at the
+   harness root.** Workspaces and the cache are deliberately gitignored, so `-x`
+   would destroy every mod in the harness. If the user wants a workspace gone, tell
+   them to run `.\scripts\vsmod.ps1 remove <Name>`.
+
+---
+
+## Two git repos, and which one you are in
+
+This matters, because running a git command in the wrong directory is destructive.
+
+| Repo | Root | Contains |
+|---|---|---|
+| The harness | harness root | The tooling: `AGENTS.md`, `scripts/`, `prompts/` |
+| The mod | `workspaces/{active}/mod/` | The mod you are working on |
+
+`harness.json`, `workspaces/`, `cache/` and `exports/` are gitignored at the harness
+root, so the harness repo never sees mod work at all.
+
+When you commit mod work, run git **inside the mod folder**, not the harness root:
+
+```powershell
+git -C workspaces/{active}/mod add -A
+git -C workspaces/{active}/mod commit -m "Add glowing mushroom block"
+```
+
+A bare `git add -A` at the harness root does nothing useful and signals you have lost
+track of where you are. Never stage harness files to record mod changes.
 
 ---
 

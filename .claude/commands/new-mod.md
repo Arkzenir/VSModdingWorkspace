@@ -1,7 +1,10 @@
-Run the following command to scaffold the mod project:
+---
+description: Scaffold a new Vintage Story mod and start building it
+---
 
-```powershell
-.\scripts\vs-workspace.ps1 new-mod $ARGUMENTS
-```
+Read `prompts/new-mod.md` and carry out that task exactly as written.
 
-Once scaffolded, read the generated files in `mods\$ARGUMENTS\` to understand the structure. Then ask me what the mod should do — what blocks, items, behaviours, mechanics, or content it should add — and begin building it following Task Mode A in CLAUDE.md.
+Arguments: $ARGUMENTS
+
+The canonical instructions live in `prompts/new-mod.md` and the project conventions in
+`AGENTS.md`. This file is only a launcher — if the two ever disagree, the prompt file wins.

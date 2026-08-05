@@ -353,16 +353,54 @@ confirmation before deleting anything.
 
 ---
 
+## Version control: two independent layers
+
+The harness and your mods are versioned separately and never interfere.
+
+| Repo | Root | Tracks |
+|---|---|---|
+| **The harness** | harness root | `AGENTS.md` + pointers, `scripts/`, `prompts/`, command adapters, `harness.example.json`, setup, README |
+| **Each mod** | `workspaces/{Name}/mod/` | That one mod, with its own history and `.gitignore` |
+
+Everything local is ignored at the harness root: `harness.json`, `workspaces/`,
+`cache/`, `exports/`, agent session state, editor files and logs. So pulling harness
+updates can never touch, overwrite or conflict with your mod work — and pushing harness
+changes can never leak your game paths, your mods, or hundreds of megabytes of cached
+game source.
+
+To confirm at any time that nothing local has crept in:
+
+```powershell
+git status --porcelain                # should be empty during normal use
+git status --porcelain --ignored      # shows what is deliberately excluded
+```
+
+> **Do not run `git clean -xfd` in the harness root.** Your mods and cache live in
+> ignored directories by design, and `-x` deletes ignored files. That single command
+> would wipe every workspace. Use `vsmod.ps1 remove <Name>` to delete a workspace
+> deliberately; it asks you to type the name first.
+
+If you cloned an earlier version that had already committed local files, ignoring them
+now is not enough — git keeps tracking what it already knows:
+
+```powershell
+git rm --cached -r harness.json workspaces cache
+git commit -m "Stop tracking local working data"
+```
+
+---
+
 ## Troubleshooting
 
 | Symptom | Cause |
 |---|---|
+| `running scripts is disabled on this system` | Run `setup.bat` (or `setup.ps1`), which sets the policy for your user. Manually: `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser` |
 | `status` shows `x api/ (not cached)` | Run the `fetch-api` command it prints |
 | A link is missing after moving the harness | Run `sync` — junctions store absolute paths |
 | Build fails on missing game DLLs | `gameDirectory` in `harness.json`, or the mod's `Properties/localSettings.props`, points at the wrong install |
 | `new` refuses a mod name | Names become C# namespaces: letters and digits only, starting with a letter |
 | Initial commit did not happen | Git has no identity yet. Set `user.name` and `user.email`, then run `git-init` |
-| Scripts blocked on Windows | Re-run `setup.bat`, or `Set-ExecutionPolicy RemoteSigned -Scope CurrentUser` |
+| Mods vanished after a git command | See the `git clean` warning above |
 
 ---
 
