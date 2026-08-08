@@ -123,7 +123,9 @@ for how a vanilla feature actually works. Match its naming and JSON structure, b
 never copy vanilla code verbatim into a mod.
 
 If a repo you need is missing, tell the user to run
-`.\scripts\vsmod.ps1 fetch-gamesrc survival`.
+`.\scripts\vsmod.ps1 fetch-gamesrc survival <version>`. Always pass the version —
+omitting it clones whatever `master` currently is (an unversioned, unpredictable
+cache entry), not the version you're actually working against.
 
 **3. Online docs — <https://apidocs.vintagestory.at/>**
 
@@ -305,7 +307,11 @@ the existing build is broken):
 
 ### D — Porting to another game version
 
-1. Make sure the target API is cached: `.\scripts\vsmod.ps1 fetch-api <version>`.
+1. Make sure the target API is cached: `.\scripts\vsmod.ps1 fetch-api <version>`, and
+   likewise pin any `gamesrc/` repos you'll be diffing to the same target version:
+   `.\scripts\vsmod.ps1 fetch-gamesrc survival <version>` (and `essentials`/`creative`
+   as needed). Omitting the version on either command silently caches latest `master`
+   instead of the version you're porting to.
 2. Diff the old and new `api/vsapi/` for changed signatures and moved types.
 3. Copy the `.csproj` to `{ModName}_{newver}.csproj`; update `<VSVersion>` and
    `<TargetFramework>` (`net7.0` for VS ≤1.20, `net8.0` for ≥1.21).
@@ -325,7 +331,9 @@ vsmod.ps1 list                       Every workspace
 vsmod.ps1 use <Name>                 Switch workspace (instant, downloads nothing)
 vsmod.ps1 build [debug|release]      Compile the active mod
 vsmod.ps1 fetch-api <version>        Cache vsapi source and link it in
-vsmod.ps1 fetch-gamesrc <name>       Cache vanilla source (essentials|survival|creative)
+vsmod.ps1 fetch-gamesrc <name> [ver] Cache vanilla source (essentials|survival|creative)
+                                      Always pass [ver] - omitting it caches latest
+                                      master under an unversioned key instead
 vsmod.ps1 add-dep <path-or-url>      Add dependency source context
 vsmod.ps1 add-example <path-or-url>  Add example mod context
 vsmod.ps1 add-dep-dll <name> <vsver> Vendor a dependency DLL into mod/deps/
