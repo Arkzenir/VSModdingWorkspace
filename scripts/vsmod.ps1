@@ -845,16 +845,63 @@ $Script:TplCommonBuildTargets = @'
           SkipUnchangedFiles="true" />
   </Target>
 
-  <!-- Release only: package Releases/{modid}_{modver}_vs{vsver}.zip -->
+  <!--
+    Files that must never reach the mod portal. Append your own with:
+      <PackageExcludes>$(PackageExcludes);$(AssetsDir)/**/*.aseprite</PackageExcludes>
+  -->
+  <PropertyGroup>
+    <PackageExcludes>
+      $(AssetsDir)/**/.gitkeep;
+      $(AssetsDir)/**/.gitignore;
+      $(AssetsDir)/**/.gitattributes;
+      $(AssetsDir)/**/Thumbs.db;
+      $(AssetsDir)/**/.DS_Store;
+      $(AssetsDir)/**/desktop.ini;
+      $(AssetsDir)/**/*.bak;
+      $(AssetsDir)/**/*.blend;
+      $(AssetsDir)/**/*.blend1;
+      $(AssetsDir)/**/*.xcf;
+      $(AssetsDir)/**/*.psd
+    </PackageExcludes>
+  </PropertyGroup>
+
+  <!--
+    Release only: package Releases/{modid}_{modver}_vs{vsver}.zip
+
+    Files are staged rather than zipping $(OutputPath) directly. That folder's
+    assets/ is a symlink back into the source tree, so archiving it sweeps in
+    every .gitkeep and every empty scaffold directory. Copying named files into
+    a staging folder avoids that, and because MSBuild creates a directory only
+    when a file actually lands in it, empty directories disappear by themselves.
+  -->
   <Target Name="ZipRelease" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
+    <PropertyGroup>
+      <StageDir>$(ProjectDir)/obj/release-stage/$(VSVersion)/$(ModId)</StageDir>
+      <ReleaseZip>$(ProjectDir)/Releases/$(ModId)_$(ModVersion)_vs$(VSVersion).zip</ReleaseZip>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <PackAsset  Include="$(AssetsDir)/**/*" Exclude="$(PackageExcludes)" />
+      <PackBinary Include="$(OutputPath)/*.dll" />
+      <PackRoot   Include="$(OutputPath)/modinfo.json" />
+      <PackRoot   Include="$(ProjectDir)/resources/modicon.png"
+                  Condition="Exists('$(ProjectDir)/resources/modicon.png')" />
+    </ItemGroup>
+
+    <RemoveDir Directories="$(StageDir)" />
+    <MakeDir Directories="$(StageDir)" />
+
+    <Copy SourceFiles="@(PackAsset)"
+          DestinationFiles="@(PackAsset->'$(StageDir)/assets/%(RecursiveDir)%(Filename)%(Extension)')" />
+    <Copy SourceFiles="@(PackBinary);@(PackRoot)" DestinationFolder="$(StageDir)" />
+
     <MakeDir Directories="$(ProjectDir)/Releases" />
-    <Delete Files="$(ProjectDir)/Releases/$(ModId)_$(ModVersion)_vs$(VSVersion).zip" />
-    <Delete Files="$(OutputPath)/$(AssemblyName).pdb" />
-    <Delete Files="$(OutputPath)/$(AssemblyName).deps.json" />
-    <Exec Condition="'$(OS)' == 'Windows_NT'"
-          Command="powershell -Command &quot;Compress-Archive -Path '$(OutputPath)\*' -DestinationPath '$(ProjectDir)\Releases\$(ModId)_$(ModVersion)_vs$(VSVersion).zip' -Force&quot;" />
-    <Exec Condition="'$(OS)' != 'Windows_NT'"
-          Command="cd '$(OutputPath)' &amp;&amp; zip -r '$(ProjectDir)/Releases/$(ModId)_$(ModVersion)_vs$(VSVersion).zip' ." />
+    <Delete Files="$(ReleaseZip)" />
+    <!-- ZipDirectory is built into MSBuild: no powershell or zip binary needed -->
+    <ZipDirectory SourceDirectory="$(StageDir)" DestinationFile="$(ReleaseZip)" />
+    <RemoveDir Directories="$(StageDir)" />
+
+    <Message Importance="high" Text="Packaged $(ReleaseZip) (@(PackAsset->Count()) asset files)" />
   </Target>
 
 </Project>
